@@ -1,0 +1,5 @@
+*.png
+extensions.json
+
+/.vscode
+/data
