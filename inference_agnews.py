@@ -27,7 +27,7 @@ class AGNewsDataset(Dataset):
         return PROMPT.format(self.text[i])
 
 def main():
-    data = datasets.load_from_disk('2000_sampled_agnews')
+    data = datasets.load_from_disk('data/2000_sampled_agnews')
     dataset = AGNewsDataset(data)
     print("Dataset length: ", len(dataset))
 

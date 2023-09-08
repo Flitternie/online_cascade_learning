@@ -1,5 +1,7 @@
 *.png
 extensions.json
 
+/__pycache__
 /.vscode
 /data
+/models

@@ -28,7 +28,7 @@ class HateSpeechDataset(Dataset):
 
 
 def main():
-    data = datasets.load_from_disk('2000_sampled_hatespeech')
+    data = datasets.load_from_disk('data/2000_sampled_hatespeech')
     dataset = HateSpeechDataset(data)
     print("Dataset length: ", len(dataset))
 

@@ -28,7 +28,7 @@ class ImdbDataset(Dataset):
 
 
 def main():
-    data = datasets.load_from_disk('1000_sampled_imdb')
+    data = datasets.load_from_disk('data/1000_sampled_imdb')
     dataset = ImdbDataset(data)
     print("Dataset length: ", len(dataset))
 
