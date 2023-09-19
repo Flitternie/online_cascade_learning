@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, LlamaForCausalLM, LlamaForSequenceClassification
 from tqdm import tqdm
 
 class LlamaModel():
@@ -7,7 +7,7 @@ class LlamaModel():
         self.args = args
         self.tokenizer = AutoTokenizer.from_pretrained(args.model)
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model = AutoModelForCausalLM.from_pretrained(args.model) 
+        self.model = LlamaForCausalLM.from_pretrained(args.model) 
         self.model = self.model.to('cuda')
         print("Llama Model loaded")
 

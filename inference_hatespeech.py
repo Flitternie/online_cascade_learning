@@ -11,19 +11,20 @@ from utils import *
 global DATASET
 DATASET = 'hatespeech'
 
+SytemPrompt = "You are given a post from an online forum and you need to check whether the post contains any hate speech. Return your answer in one word (yes or no) without any explanations. "
+Prompt = '''{}'''
+PROMPT = " ".join(["[INST]", B_SYS, SytemPrompt, E_SYS, Prompt, "[/INST]"])
+
 class HateSpeechDataset(Dataset):
     def __init__(self, dataset):
         self.text = dataset['text']
         self.labels = dataset['label']
-        SytemPrompt = "You are given a post from an online forum and you need to check whether the post contains any hate speech. Return your answer in one word (yes or no) without any explanations. "
-        Prompt = '''{}'''
-        self.PROMPT = " ".join(["[INST]", B_SYS, SytemPrompt, E_SYS, Prompt, "[/INST]"])
 
     def __len__(self):
         return len(self.text)
 
     def __getitem__(self, i):
-        return self.PROMPT.format(self.text[i])
+        return PROMPT.format(self.text[i])
 
 def postprocess(output):
     if "no" in output:

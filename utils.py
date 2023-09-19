@@ -16,6 +16,10 @@ class GenericDataset(Dataset):
     def __getitem__(self, idx):
         return self.text[idx], self.labels[idx]
 
+class ModelArguments():
+    def __init__(self) -> None:
+        pass
+
 def evaluate(dataset, outputs, predictions):
     # save predictions
     with open(f"{DATASET}_predictions.txt", "w", encoding="utf-8") as f:

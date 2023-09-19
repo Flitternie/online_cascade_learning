@@ -18,11 +18,17 @@ class BertModel():
         self.model = self.model.to('cuda')
         self.args.max_length = self.tokenizer.model_max_length
         print("BERT Model loaded")
+    
+    def initialize_model(self):
+        # clean up GPU memory and reload model
+        torch.cuda.empty_cache()
+        self.model = AutoModelForSequenceClassification.from_pretrained(self.args.model, num_labels=self.args.num_labels)
+        self.model = self.model.to('cuda')
 
     def train(self, train_dataloader, val_dataloader):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
         best_val_acc = 0
-        for epoch in range(args.epochs):
+        for epoch in range(self.args.epochs):
             print("Epoch: ", epoch)
             self.model.train()
             # setup progress bar to show loss
@@ -38,16 +44,16 @@ class BertModel():
                 optimizer.step()
                 optimizer.zero_grad()
             # do evaluation
-            predictions, val_acc = self.inference(args, val_dataloader, self.model, self.tokenizer)
+            predictions, val_acc = self.inference(val_dataloader)
             # save best performing model
-            print("Validation Accuracy: ", val_acc)
-            if val_acc > best_val_acc:
-                best_val_acc = val_acc
-                print("Saving model...")
-                # create directory if it doesn't exist
-                if not os.path.exists('models'):
-                    os.makedirs('models')
-                torch.save(self.model.state_dict(), f'models/bert_{self.args.data_card}.pt')
+            # print("Validation Accuracy: ", val_acc)
+            # if val_acc > best_val_acc:
+            #     best_val_acc = val_acc
+            #     print("Saving model...")
+            #     # create directory if it doesn't exist
+            #     if not os.path.exists('models'):
+            #         os.makedirs('models')
+            #     torch.save(self.model.state_dict(), f'models/bert_{self.args.data_card}.pt')
 
     def train_online(self, data):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
@@ -107,9 +113,9 @@ def main(args):
     test_size = len(dataset) - train_size - val_size
 
     train_data, val_data, test_data = random_split(dataset, [train_size, val_size, test_size])
-    train_dataloader = DataLoader(train_data, batch_size=32, shuffle=True)
-    val_dataloader = DataLoader(val_data, batch_size=32, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=32, shuffle=True)
+    train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
     print("Data loaded, train size: ", len(train_data), " val size: ", len(val_data), " test size: ", len(test_data))
     
     # initialize model
@@ -119,13 +125,13 @@ def main(args):
     
     # train model
     if args.train:
-        bert_model.train(args, train_dataloader, val_dataloader)
+        bert_model.train(train_dataloader, val_dataloader)
         print("Model trained")
 
     # inference with best model
     if args.inference:
         bert_model.model.load_state_dict(torch.load(f'models/bert_{args.data_card}.pt'))
-        predictions, acc = bert_model.inference(args, test_dataloader)
+        predictions, acc = bert_model.inference(test_dataloader)
         print("Inference done")
         print("Test Accuracy: ", acc)
         predictions = predictions.cpu().numpy()
@@ -133,12 +139,12 @@ def main(args):
         true_labels = np.array([x[1] for x in test_data])
         # calculate accuracy per class
         for i in range(dataset.num_labels):
-            idx = (true_labels == i)
-            print("Class: ", i, " Accuracy: ", np.mean(predictions[idx] == true_labels[idx]))
+            idx = np.where(true_labels == i)[0]
+            print("Class: ", i, " Accuracy: ", np.sum(predictions[idx] == true_labels[idx]) / len(idx))
     
         with open(f'models/bert_{args.data_card}_outputs.txt', 'w') as f:
-            for pred in predictions:
-                f.write(str(int(pred)) + '\n')
+            for pred, gold in zip(predictions, true_labels):
+                f.write(str(int(pred)) + '\t' + str(int(gold)) + '\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -11,19 +11,20 @@ from utils import *
 global DATASET
 DATASET = 'agnews'
 
+SytemPrompt = "You are given a sentence that belongs to one of the 4 categories including (1) World, (2) Sports, (3) Business, (4) Sci/Tech. You should read the sentence and tell the user which category it belongs to. Return your answer in one word. "
+Prompt = '''{}'''
+PROMPT = " ".join(["[INST]", B_SYS, SytemPrompt, E_SYS, Prompt, "[/INST]"])
+
 class AGNewsDataset(Dataset):
     def __init__(self, dataset):
         self.text = dataset['text']
         self.labels = dataset['label']
-        SytemPrompt = "You are given a sentence that belongs to one of the 4 categories including (1) World, (2) Sports, (3) Business, (4) Sci/Tech. You should read the sentence and tell the user which category it belongs to. Return your answer in one word. "
-        Prompt = '''{}'''
-        self.ROMPT = " ".join(["[INST]", B_SYS, SytemPrompt, E_SYS, Prompt, "[/INST]"])
 
     def __len__(self):
         return len(self.text)
 
     def __getitem__(self, i):
-        return self.PROMPT.format(self.text[i])
+        return PROMPT.format(self.text[i])
 
 def postprocess(output):
     if "world" in output:
@@ -35,7 +36,7 @@ def postprocess(output):
     elif "sci" in output or "tech" in output:
         return 3
     else:
-        return 4
+        return 0
 
 
 def main():

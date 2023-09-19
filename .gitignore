@@ -1,5 +1,7 @@
 *.png
+*.log
 extensions.json
+misc.ipynb
 
 /__pycache__
 /.vscode
