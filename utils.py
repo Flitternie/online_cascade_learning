@@ -43,3 +43,6 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+def sort_dict_by_key(d):
+    return {k: v for k, v in sorted(d.items(), key=lambda item: item[0])}

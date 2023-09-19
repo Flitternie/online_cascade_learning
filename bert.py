@@ -8,7 +8,7 @@ import argparse
 import datasets
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from utils import GenericDataset, set_seed
+from utils import *
 
 class BertModel():
     def __init__(self, args):
@@ -17,6 +17,10 @@ class BertModel():
         self.model = AutoModelForSequenceClassification.from_pretrained(self.args.model, num_labels=self.args.num_labels)
         self.model = self.model.to('cuda')
         self.args.max_length = self.tokenizer.model_max_length
+
+        if "class_weight" in dir(self.args):
+            self.class_weight = self.args.class_weight
+            self.class_count = [0 for _ in range(self.args.num_labels)]
         print("BERT Model loaded")
     
     def initialize_model(self):
@@ -31,6 +35,22 @@ class BertModel():
         for epoch in range(self.args.epochs):
             print("Epoch: ", epoch)
             self.model.train()
+            if "class_weight" in dir(self.args):
+                if self.args.class_weight == "balanced":
+                    for batch in train_dataloader:
+                        for label in batch[1]:
+                            self.class_count[int(label)] += 1
+                    # balanced class weights computed by: n_samples / (n_classes * np.bincount(y))
+                    self.class_weight =  {i: sum(self.class_count) / max(( self.args.num_labels * self.class_count[i] ), 1) for i in range(self.args.num_labels)}
+                    # normalize to sum up to 1
+                    self.class_weight = {k: v / sum(self.class_weight.values()) for k, v in self.class_weight.items()}    
+                assert isinstance(self.class_weight, dict)
+                assert len(self.class_weight.keys()) == self.args.num_labels
+                assert sum(self.class_weight.values()) == 1
+                self.class_weight = sort_dict_by_key(self.class_weight)
+            else:
+                self.class_weight = None
+                
             # setup progress bar to show loss
             pbar = tqdm(train_dataloader)
             for step, batch in enumerate(pbar):
@@ -38,7 +58,11 @@ class BertModel():
                 encoded_text = encoded_text.to('cuda')
                 true_labels = batch[1].to('cuda')
                 outputs = self.model(**encoded_text, labels=true_labels)
-                loss = outputs.loss
+                if self.class_weight is not None:
+                    loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(self.class_weight.values(), dtype=torch.float32).to('cuda'))
+                    loss = loss_fct(outputs.logits.view(-1, self.num_labels), true_labels.view(-1))
+                else:
+                    loss = outputs.loss
                 pbar.set_description(f"Loss: {loss.item():.4f}")
                 loss.backward()
                 optimizer.step()
@@ -46,18 +70,33 @@ class BertModel():
             # do evaluation
             predictions, val_acc = self.inference(val_dataloader)
             # save best performing model
-            # print("Validation Accuracy: ", val_acc)
-            # if val_acc > best_val_acc:
-            #     best_val_acc = val_acc
-            #     print("Saving model...")
-            #     # create directory if it doesn't exist
-            #     if not os.path.exists('models'):
-            #         os.makedirs('models')
-            #     torch.save(self.model.state_dict(), f'models/bert_{self.args.data_card}.pt')
+            print("Validation Accuracy: ", val_acc)
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                print("Saving model...")
+                # create directory if it doesn't exist
+                if not os.path.exists('models'):
+                    os.makedirs('models')
+                torch.save(self.model.state_dict(), f'models/bert_{self.args.data_card}.pt')
 
     def train_online(self, data):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
         self.model.train()
+        if "class_weight" in dir(self.args):
+            if self.args.class_weight == "balanced":
+                for batch in data:
+                    for label in batch[1]:
+                        self.class_count[int(label)] += 1
+                # balanced class weights computed by: n_samples / (n_classes * np.bincount(y))
+                self.class_weight =  {i: sum(self.class_count) / max(( self.args.num_labels * self.class_count[i] ), 1) for i in range(self.args.num_labels)}
+                # normalize to sum up to 1
+                self.class_weight = {k: v / sum(self.class_weight.values()) for k, v in self.class_weight.items()}    
+            assert isinstance(self.class_weight, dict)
+            assert len(self.class_weight.keys()) == self.args.num_labels
+            assert sum(self.class_weight.values()) == 1
+            self.class_weight = sort_dict_by_key(self.class_weight)
+        else:
+            self.class_weight = None
         # setup progress bar to show loss
         pbar = tqdm(data)
         for step, batch in enumerate(pbar):
@@ -65,15 +104,17 @@ class BertModel():
             encoded_text = encoded_text.to('cuda')
             true_labels = batch[1].to('cuda')
             outputs = self.model(**encoded_text, labels=true_labels)
-            loss = outputs.loss
+            if self.class_weight is not None:
+                loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(self.class_weight.values(), dtype=torch.float32).to('cuda'))
+                loss = loss_fct(outputs.logits.view(-1, self.num_labels), true_labels.view(-1))
+            else:
+                loss = outputs.loss
             pbar.set_description(f"Loss: {loss.item():.4f}")
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
         # torch.cuda.empty_cache()
-        self.model.eval()
-
-            
+        self.model.eval()            
 
     def inference(self, dataloader):
         self.model.eval()

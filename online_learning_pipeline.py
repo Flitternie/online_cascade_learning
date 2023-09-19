@@ -1,6 +1,6 @@
 import os
 # set CUDA_VISIBLE_DEVICES before importing torch
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import numpy as np
 import datasets
@@ -21,7 +21,10 @@ class LogisticRegressionModel():
         self.args = args
         self.model = SGDClassifier(loss='log_loss')
         self.vectorizer = TfidfVectorizer()
-        # self.class_count = [0 for _ in range(self.args.num_labels)]
+        
+        if "class_weight" in dir(self.args):
+            self.class_weight = self.args.class_weight
+            self.class_count = [0 for _ in range(self.args.num_labels)]
         print("Logistic Regression Model initialized")
     
     def initialize_vectorizer(self, data):
@@ -31,8 +34,16 @@ class LogisticRegressionModel():
         # train_data = self.vectorizer.fit_transform(train_data['text'])
         for label in train_data['label']:
             self.class_count[int(label)] += 1
-        # n_samples / (n_classes * np.bincount(y))
-        self.model.class_weight = {i: sum(self.class_count) / max(( self.args.num_labels * self.class_count[i] ), 1) for i in range(self.args.num_labels)}
+        if "class_weight" in dir(self.args):
+            if self.args.class_weight == "balanced":
+                # balanced class weights computed by: n_samples / (n_classes * np.bincount(y))
+                self.class_weight =  {i: sum(self.class_count) / max(( self.args.num_labels * self.class_count[i] ), 1) for i in range(self.args.num_labels)}
+                # normalize to sum up to 1
+                self.class_weight = {k: v / sum(self.class_weight.values()) for k, v in self.class_weight.items()}    
+            assert isinstance(self.args.class_weight, dict)
+            assert len(self.class_weight.keys()) == self.args.num_labels
+            assert sum(self.class_weight.values()) == 1
+            self.model.class_weight = sort_dict_by_key(self.class_weight)
         train_data_vector = self.vectorizer.transform(train_data['text'])
         self.model.partial_fit(train_data_vector, train_data['label'], classes=np.arange(self.args.num_labels))
     
