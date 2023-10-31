@@ -2,18 +2,19 @@ import os
 # set CUDA_VISIBLE_DEVICES before importing torch
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
-import numpy as np
+import torch
+import torch.nn as nn
+
 import datasets
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression, SGDClassifier
-from sklearn.utils.class_weight import compute_class_weight
 
 import bert
 import llama
 
-# from inference_imdb import *
+from inference_imdb import *
 # from inference_agnews import *
-from inference_hatespeech import *
+# from inference_hatespeech import *
 from utils import *
 
 class LogisticRegressionModel():
@@ -31,18 +32,18 @@ class LogisticRegressionModel():
         self.vectorizer.fit_transform(data)
 
     def train(self, train_data):
-        # train_data = self.vectorizer.fit_transform(train_data['text'])
-        for label in train_data['label']:
-            self.class_count[int(label)] += 1
+        # train_data = self.vectorizer.fit_transform(train_data['text'])    
         if "class_weight" in dir(self.args):
+            for label in train_data['label']:
+                self.class_count[int(label)] += 1
             if self.args.class_weight == "balanced":
                 # balanced class weights computed by: n_samples / (n_classes * np.bincount(y))
                 self.class_weight =  {i: sum(self.class_count) / max(( self.args.num_labels * self.class_count[i] ), 1) for i in range(self.args.num_labels)}
                 # normalize to sum up to 1
                 self.class_weight = {k: v / sum(self.class_weight.values()) for k, v in self.class_weight.items()}    
-            assert isinstance(self.args.class_weight, dict)
-            assert len(self.class_weight.keys()) == self.args.num_labels
-            assert sum(self.class_weight.values()) == 1
+            assert isinstance(self.class_weight, dict), f"Class weight is not a dict: {self.class_weight}"
+            assert len(self.class_weight.keys()) == self.args.num_labels, f"Class weight keys: {self.class_weight.keys()} not equal to num_labels: {self.args.num_labels}"
+            assert equal(sum(self.class_weight.values()), 1), f"Sum of class weights is {sum(self.class_weight.values())}"
             self.model.class_weight = sort_dict_by_key(self.class_weight)
         train_data_vector = self.vectorizer.transform(train_data['text'])
         self.model.partial_fit(train_data_vector, train_data['label'], classes=np.arange(self.args.num_labels))
@@ -61,6 +62,8 @@ def main():
     lr_config.num_labels = 2
     lr_config.confidence_threshold = 1.5
     lr_config.online_batch_size = 8
+    # lr_config.class_weight = "balanced"
+    lr_config.eta = 0.3
 
     bert_config = ModelArguments()
     bert_config.model = "bert-base-uncased"
@@ -68,6 +71,8 @@ def main():
     bert_config.confidence_threshold = 0.7
     bert_config.online_batch_size = 32
     bert_config.online_minibatch_size = 16
+    # bert_config.class_weight = "balanced"
+    bert_config.eta = 0.8
 
     llama_config = ModelArguments()
     llama_config.model = "meta-llama/Llama-2-7b-chat-hf"
@@ -77,7 +82,7 @@ def main():
 
     set_seed(42)
 
-    data = datasets.load_from_disk("data/2000_sampled_hatespeech")
+    data = datasets.load_from_disk("data/1000_sampled_imdb")
     data = data.shuffle()
     lr_config.num_labels = len(set(data['label']))
     bert_config.num_labels = len(set(data['label']))
@@ -186,6 +191,5 @@ def main():
         print(msg)
     f.close()
 
-main()
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
