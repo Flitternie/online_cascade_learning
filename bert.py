@@ -33,7 +33,7 @@ class BertModel():
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
         best_val_acc = 0
         for epoch in range(self.args.epochs):
-            print("Epoch: ", epoch)
+            print("Epoch: ", epoch+1)
             self.model.train()
             if "class_weight" in dir(self.args):
                 if self.args.class_weight == "balanced":
@@ -44,9 +44,9 @@ class BertModel():
                     self.class_weight =  {i: sum(self.class_count) / max(( self.args.num_labels * self.class_count[i] ), 1) for i in range(self.args.num_labels)}
                     # normalize to sum up to 1
                     self.class_weight = {k: v / sum(self.class_weight.values()) for k, v in self.class_weight.items()}    
-                assert isinstance(self.class_weight, dict)
-                assert len(self.class_weight.keys()) == self.args.num_labels
-                assert sum(self.class_weight.values()) == 1
+                assert isinstance(self.class_weight, dict), f"Class weight is not a dict: {self.class_weight}"
+                assert len(self.class_weight.keys()) == self.args.num_labels, f"Class weight keys: {self.class_weight.keys()} not equal to num_labels: {self.args.num_labels}"
+                assert equal(sum(self.class_weight.values()), 1), f"Sum of class weights is {sum(self.class_weight.values())}"
                 self.class_weight = sort_dict_by_key(self.class_weight)
             else:
                 self.class_weight = None
@@ -59,8 +59,8 @@ class BertModel():
                 true_labels = batch[1].to('cuda')
                 outputs = self.model(**encoded_text, labels=true_labels)
                 if self.class_weight is not None:
-                    loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(self.class_weight.values(), dtype=torch.float32).to('cuda'))
-                    loss = loss_fct(outputs.logits.view(-1, self.num_labels), true_labels.view(-1))
+                    loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(list(self.class_weight.values()), dtype=torch.float32).to('cuda'))
+                    loss = loss_fct(outputs.logits.view(-1, self.args.num_labels), true_labels.view(-1))
                 else:
                     loss = outputs.loss
                 pbar.set_description(f"Loss: {loss.item():.4f}")
@@ -77,7 +77,7 @@ class BertModel():
                 # create directory if it doesn't exist
                 if not os.path.exists('models'):
                     os.makedirs('models')
-                torch.save(self.model.state_dict(), f'models/bert_{self.args.data_card}.pt')
+                torch.save(self.model.state_dict(), f'{self.args.model_dir}.pt')
 
     def train_online(self, data):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
@@ -91,9 +91,9 @@ class BertModel():
                 self.class_weight =  {i: sum(self.class_count) / max(( self.args.num_labels * self.class_count[i] ), 1) for i in range(self.args.num_labels)}
                 # normalize to sum up to 1
                 self.class_weight = {k: v / sum(self.class_weight.values()) for k, v in self.class_weight.items()}    
-            assert isinstance(self.class_weight, dict)
-            assert len(self.class_weight.keys()) == self.args.num_labels
-            assert sum(self.class_weight.values()) == 1
+            assert isinstance(self.class_weight, dict), f"Class weight is not a dict: {self.class_weight}"
+            assert len(self.class_weight.keys()) == self.args.num_labels, f"Class weight keys: {self.class_weight.keys()} not equal to num_labels: {self.args.num_labels}"
+            assert equal(sum(self.class_weight.values()), 1), f"Sum of class weights is {sum(self.class_weight.values())}"
             self.class_weight = sort_dict_by_key(self.class_weight)
         else:
             self.class_weight = None
@@ -104,9 +104,9 @@ class BertModel():
             encoded_text = encoded_text.to('cuda')
             true_labels = batch[1].to('cuda')
             outputs = self.model(**encoded_text, labels=true_labels)
-            if self.class_weight is not None:
-                loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(self.class_weight.values(), dtype=torch.float32).to('cuda'))
-                loss = loss_fct(outputs.logits.view(-1, self.num_labels), true_labels.view(-1))
+            if "class_weight" in dir(self.args):
+                loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(list(self.class_weight.values()), dtype=torch.float32).to('cuda'))
+                loss = loss_fct(outputs.logits.view(-1, self.args.num_labels), true_labels.view(-1))
             else:
                 loss = outputs.loss
             pbar.set_description(f"Loss: {loss.item():.4f}")
@@ -171,7 +171,7 @@ def main(args):
 
     # inference with best model
     if args.inference:
-        bert_model.model.load_state_dict(torch.load(f'models/bert_{args.data_card}.pt'))
+        bert_model.model.load_state_dict(torch.load(f'{args.model_dir}.pt'))
         predictions, acc = bert_model.inference(test_dataloader)
         print("Inference done")
         print("Test Accuracy: ", acc)
@@ -183,14 +183,15 @@ def main(args):
             idx = np.where(true_labels == i)[0]
             print("Class: ", i, " Accuracy: ", np.sum(predictions[idx] == true_labels[idx]) / len(idx))
     
-        with open(f'models/bert_{args.data_card}_outputs.txt', 'w') as f:
+        with open(f'{args.model_dir}_outputs.txt', 'w') as f:
             for pred, gold in zip(predictions, true_labels):
                 f.write(str(int(pred)) + '\t' + str(int(gold)) + '\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_card', type=str, default='agnews')
-    parser.add_argument('--data_dir', type=str, default='data/2000_sampled_agnews')
+    parser.add_argument('--model_dir', type=str)
+    parser.add_argument('--data_dir', type=str)
+    parser.add_argument('--data_card', type=str)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--model', type=str, default='bert-base-uncased')
     parser.add_argument('--batch_size', type=int, default=32)

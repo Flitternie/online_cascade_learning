@@ -20,6 +20,11 @@ class ModelArguments():
     def __init__(self) -> None:
         pass
 
+def normalized_entropy(x, gamma=4, eps=1e-6):
+    x = x + eps # add eps to avoid log(0)
+    x = x / torch.sum(x, dim=-1, keepdim=True)
+    return (-torch.sum(x * torch.log(x), dim=-1) / np.log(x.shape[-1])) ** gamma
+
 def evaluate(dataset, outputs, predictions):
     # save predictions
     with open(f"{DATASET}_predictions.txt", "w", encoding="utf-8") as f:
@@ -46,3 +51,6 @@ def set_seed(seed):
 
 def sort_dict_by_key(d):
     return {k: v for k, v in sorted(d.items(), key=lambda item: item[0])}
+
+def equal(a, b):
+    return abs(a - b) < 1e-6
