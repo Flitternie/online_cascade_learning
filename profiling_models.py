@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 
 from bert import BertModel
 from llama import LlamaModel
-from online_learning_pipeline import LogisticRegressionModel
+from online_cascade_imdb import LogisticRegressionModel
 
 from inference_imdb import *
 from utils import *

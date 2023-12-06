@@ -1,5 +1,8 @@
 *.png
 *.log
+*.pdf
+*.txt
+*.pyc
 extensions.json
 misc.ipynb
 

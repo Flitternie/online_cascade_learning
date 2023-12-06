@@ -1,32 +1,26 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.models.llama.tokenization_llama import B_SYS, E_SYS
-import datasets
-from torch.utils.data import Dataset
-
-import argparse
-import llama
 from utils import *
 
-global DATASET
 DATASET = 'agnews'
 
-SytemPrompt = "You are given a sentence that belongs to one of the 4 categories including (1) World, (2) Sports, (3) Business, (4) Sci/Tech. You should read the sentence and tell the user which category it belongs to. Return your answer in one word. "
-Prompt = '''{}'''
+SytemPrompt = '''The following task involves classifying news articles into one of four categories: World, Sports, Business, and Science/Technology. Each article belongs to only one category. The categories are defined as follows:
+
+1. World: Focus on articles discussing geopolitical events, international relations, and global issues. This class primarily includes coverage of world leaders, international diplomacy, conflicts between nations, and global crises like pandemics or climate change. Distinct from business or sports news, these articles center on the interactions and policies between countries or major global movements.
+
+2. Sports: Concentrate on sports-related content. This includes detailed reports on sports events, athlete profiles, game analysis, and team/club updates. It's important to differentiate between sports events taking place internationally (which would still fall under the Sports category) and international political or social events. For instance, a match between two countries is Sports, not World, even though it involves international teams.
+
+3. Business: Focus on the economic and corporate sector. Articles in this class should primarily deal with financial markets, corporate news, economic policies, and business-related legislation. Distinguish this from Technology by focusing on the financial and economic aspects of companies rather than their technological innovations or scientific research.
+
+4. Science/Technology: Emphasize articles that are primarily about scientific discoveries, technological advancements, and their implications. This includes news on tech companies' innovations, scientific research findings, and discussions on new technologies. Anything related to a tech company should be categorized under Science/Technology unless the primary focus is on the financial aspect.
+
+You will be given a news article excerpt. Your task is to determine which of these four categories the article best fits into.
+'''
+Prompt = '''Article Excerpt: {}\n
+Question: Which category does this news article belong to? Return the EXACT class name ONLY.'''
 PROMPT = " ".join(["[INST]", B_SYS, SytemPrompt, E_SYS, Prompt, "[/INST]"])
 
-class AGNewsDataset(Dataset):
-    def __init__(self, dataset):
-        self.text = dataset['text']
-        self.labels = dataset['label']
-
-    def __len__(self):
-        return len(self.text)
-
-    def __getitem__(self, i):
-        return PROMPT.format(self.text[i])
-
 def postprocess(output):
+    output = output.lower()
     if "world" in output:
         return 0
     elif "sports" in output:
@@ -37,32 +31,3 @@ def postprocess(output):
         return 3
     else:
         return 0
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="meta-llama/Llama-2-7b-chat-hf")
-    parser.add_argument("--temperature", type=float, default=0.3)
-    parser.add_argument("--max_new_tokens", type=int, default=100)
-    parser.add_argument("--top_k", type=int, default=5)
-    parser.add_argument("--data_dir", type=str, default="data/2000_sampled_agnews")
-    parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
-
-    data = datasets.load_from_disk(args.data_dir)
-    dataset = AGNewsDataset(data)
-    print("Dataset length: ", len(dataset))
-
-    # iterate through the agnews dataset 
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
-    llama_model = llama.LlamaModel(args)
-    outputs = llama_model.inference(args, dataloader)
-    predictions = []
-    for output in outputs:
-        predictions.append(postprocess(output))
-
-    evaluate(dataset, outputs, predictions)
-    print("Done!")
-
-if __name__ == "__main__":
-    main()
