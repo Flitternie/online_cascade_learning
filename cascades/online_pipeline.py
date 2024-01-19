@@ -8,6 +8,7 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
     mse_loss = torch.nn.MSELoss()
     cre_loss = torch.nn.CrossEntropyLoss()
 
+    assert lr_wrapper.model.args.num_labels == bert_wrapper.model.args.num_labels
     print("Data loaded, #labels: ", lr_wrapper.model.args.num_labels)
     f = open(f"./logs/online_cascade/{data_module.DATASET}/{mu:.4f}.log", "w+")
 
@@ -15,22 +16,23 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
     lr_score, bert_score = 0, 0
     lr_acted, bert_acted = 0, 0
     lr_update, bert_update = 0, 0
-    llama_correct = 0
-    llama_acted = 0
-    overall_correct = 0
-
     lr_decision_correct, bert_decision_correct = 0, 0
+
+    llm_correct = 0
+    llm_acted = 0
+    overall_correct = 0
 
     lr_wrapper.train()
     bert_wrapper.train()
+
     bar = tqdm.tqdm(range(len(data)))
     for i, item in enumerate(data):
         text = item['text']
-        lr_pred, bert_pred, llama_pred = -1, -1, -1
+        lr_pred, bert_pred, llm_pred = -1, -1, -1
         lr_decision, bert_decision = -1., -1.
 
         if len(lr_wrapper.model.online_cache['llm_label']) == lr_wrapper.model.args.cache_size:
-            lr_wrapper.model.train(lr_wrapper.model.online_cache)
+            lr_wrapper.model.train_online(lr_wrapper.model.online_cache)
             lr_wrapper.model.cache_clear()
             lr_update += 1
         if len(bert_wrapper.model.online_cache['llm_label']) == bert_wrapper.model.args.cache_size:
@@ -40,15 +42,13 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
         
         # warmup for the wrapper
         if lr_update < 10 or bert_update < 10:
-            # llama_output, _ = llama_model.predict(PROMPT.format(item['text']))
-            # llama_pred = postprocess(llama_output)
-            llama_pred = int(item['llm_label'])
-            if int(llama_pred) == item['label']:
-                llama_correct += 1
+            llm_pred = int(item['llm_label'])
+            if int(llm_pred) == item['label']:
+                llm_correct += 1
                 overall_correct += 1
-            llama_acted += 1
-            lr_wrapper.model.cache_add(text, llama_pred)
-            bert_wrapper.model.cache_add(text, llama_pred)
+            llm_acted += 1
+            lr_wrapper.model.cache_add(text, llm_pred)
+            bert_wrapper.model.cache_add(text, llm_pred)
 
             # warmup for the wrapper, skip the first updates
             if lr_update > 2 and bert_update > 2:
@@ -61,16 +61,16 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
                 if int(bert_pred) == item['label']:
                     bert_correct += 1
 
-                lr_right_decision = torch.tensor([min(int(int(lr_pred) != llama_pred), 1.0)]).float().unsqueeze(0).to('cuda')
+                lr_right_decision = torch.tensor([min(int(int(lr_pred) != llm_pred), 1.0)]).float().unsqueeze(0).to('cuda')
                 lr_confidence_cost = mse_loss(lr_decision, lr_right_decision) 
                 lr_confidence_cost += lr_wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in lr_wrapper.parameters()]))
 
-                bert_right_decision = torch.tensor([min(int(int(bert_pred) != llama_pred), 1.0)]).float().unsqueeze(0).to('cuda')
+                bert_right_decision = torch.tensor([min(int(int(bert_pred) != llm_pred), 1.0)]).float().unsqueeze(0).to('cuda')
                 bert_confidence_cost = mse_loss(bert_decision, bert_right_decision)
                 bert_confidence_cost += bert_wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in bert_wrapper.parameters()]))
 
-                lr_cost = (1 - lr_decision.transpose(0,1)[-1]) * cre_loss(lr_prob, torch.tensor([llama_pred]).to('cuda')) + lr_decision.transpose(0,1)[-1] * lr_wrapper.model.args.cost * mu
-                bert_cost = (1 - bert_decision.transpose(0,1)[-1]) * cre_loss(bert_prob, torch.tensor([llama_pred]).to('cuda')) + bert_decision.transpose(0,1)[-1] * bert_wrapper.model.args.cost * mu
+                lr_cost = (1 - lr_decision.transpose(0,1)[-1]) * cre_loss(lr_prob, torch.tensor([llm_pred]).to('cuda')) + lr_decision.transpose(0,1)[-1] * lr_wrapper.model.args.cost * mu
+                bert_cost = (1 - bert_decision.transpose(0,1)[-1]) * cre_loss(bert_prob, torch.tensor([llm_pred]).to('cuda')) + bert_decision.transpose(0,1)[-1] * bert_wrapper.model.args.cost * mu
                 
                 total_cost = lr_cost + bert_cost * lr_decision.transpose(0,1)[-1]
 
@@ -84,7 +84,7 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
                 lr_decision = float(lr_decision.squeeze(0)[-1].item())
                 bert_decision = float(bert_decision.squeeze(0)[-1].item())
             
-            f.write(f"{lr_pred},{bert_pred},{llama_pred},{item['label']},{lr_acted/(i+1):.2f},{bert_acted/(i+1):.2f},{lr_decision:.4f},{bert_decision:.4f},na,na,{lr_correct/(i+1):.2f},{bert_correct/(i+1):.2f},{llama_correct/max(1,llama_acted):.4f},{overall_correct/(i+1):.4f}\n")
+            f.write(f"{lr_pred},{bert_pred},{llm_pred},{item['label']},{lr_acted/(i+1):.2f},{bert_acted/(i+1):.2f},{lr_decision:.4f},{bert_decision:.4f},na,na,{lr_correct/(i+1):.2f},{bert_correct/(i+1):.2f},{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}\n")
             bar.update(1)
             continue
 
@@ -114,7 +114,7 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
         else:  
             # bert prediction
 
-            # decaying probability of proceeding to llama
+            # decaying probability of proceeding to llm
             bert_decaying_prob = bert_wrapper.decaying_factor ** (bert_update)
             bert_action = (bert_decision.item() > 0.5)
 
@@ -124,32 +124,32 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
                     bert_score += 1
                     overall_correct += 1
                 bert_acted += 1
-            # proceed to llama
+            # proceed to llm
             else:
-                # llama_output, _ = llama_model.predict(PROMPT.format(item['text']))
-                # llama_pred = postprocess(llama_output)
-                llama_pred = int(item['llm_label'])
-                if int(llama_pred) == item['label']:
-                    llama_correct += 1
+                # llm_output, _ = llm_model.predict(PROMPT.format(item['text']))
+                # llm_pred = postprocess(llm_output)
+                llm_pred = int(item['llm_label'])
+                if int(llm_pred) == item['label']:
+                    llm_correct += 1
                     overall_correct += 1
-                llama_acted += 1
+                llm_acted += 1
 
-                lr_wrapper.model.cache_add(text, llama_pred)
-                bert_wrapper.model.cache_add(text, llama_pred)
+                lr_wrapper.model.cache_add(text, llm_pred)
+                bert_wrapper.model.cache_add(text, llm_pred)
 
-                lr_decision_correct += int(int(lr_pred) == llama_pred) ^ int(lr_action != 0)
-                bert_decision_correct += int(int(bert_pred) == llama_pred) ^ int(bert_action != 0)
+                lr_decision_correct += int(int(lr_pred) == llm_pred) ^ int(lr_action != 0)
+                bert_decision_correct += int(int(bert_pred) == llm_pred) ^ int(bert_action != 0)
 
-                lr_right_decision = torch.tensor([min(int(int(lr_pred) != llama_pred) + lr_wrapper.calibration , 1.0)]).float().unsqueeze(0).to('cuda')
+                lr_right_decision = torch.tensor([min(int(int(lr_pred) != llm_pred) + lr_wrapper.calibration, 1.0)]).float().unsqueeze(0).to('cuda')
                 lr_confidence_cost = mse_loss(lr_decision, lr_right_decision) 
                 lr_confidence_cost += lr_wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in lr_wrapper.parameters()]))
 
-                bert_right_decision = torch.tensor([min(int(int(bert_pred) != llama_pred) + bert_wrapper.calibration, 1.0)]).float().unsqueeze(0).to('cuda')
+                bert_right_decision = torch.tensor([min(int(int(bert_pred) != llm_pred) + bert_wrapper.calibration, 1.0)]).float().unsqueeze(0).to('cuda')
                 bert_confidence_cost = mse_loss(bert_decision, bert_right_decision)
                 bert_confidence_cost += bert_wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in bert_wrapper.parameters()]))
 
-                lr_cost = (1 - lr_decision.transpose(0,1)[-1]) * cre_loss(lr_prob, torch.tensor([llama_pred]).to('cuda')) + lr_decision.transpose(0,1)[-1] * lr_wrapper.model.args.cost * mu
-                bert_cost = (1 - bert_decision.transpose(0,1)[-1]) * cre_loss(bert_prob, torch.tensor([llama_pred]).to('cuda')) + bert_decision.transpose(0,1)[-1] * bert_wrapper.model.args.cost * mu
+                lr_cost = (1 - lr_decision.transpose(0,1)[-1]) * cre_loss(lr_prob, torch.tensor([llm_pred]).to('cuda')) + lr_decision.transpose(0,1)[-1] * lr_wrapper.model.args.cost * mu
+                bert_cost = (1 - bert_decision.transpose(0,1)[-1]) * cre_loss(bert_prob, torch.tensor([llm_pred]).to('cuda')) + bert_decision.transpose(0,1)[-1] * bert_wrapper.model.args.cost * mu
                 
                 total_cost = lr_cost + bert_cost * lr_decision.transpose(0,1)[-1]
 
@@ -164,14 +164,14 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
 
         bar.update(1)
         try:
-            f.write(f"{lr_pred},{bert_pred},{llama_pred},{item['label']},{lr_acted/(i+1):.4f},{bert_acted/(i+1):.4f},{lr_decision:.4f},{bert_decision:.4f},{lr_score/max(1,lr_acted):.4f},{bert_score/max(1,bert_acted):.4f},{lr_correct/(i+1):.4f},{bert_correct/(i+1):.4f},{llama_correct/max(1,llama_acted):.4f},{overall_correct/(i+1):.4f}\n")
+            f.write(f"{lr_pred},{bert_pred},{llm_pred},{item['label']},{lr_acted/(i+1):.4f},{bert_acted/(i+1):.4f},{lr_decision:.4f},{bert_decision:.4f},{lr_score/max(1,lr_acted):.4f},{bert_score/max(1,bert_acted):.4f},{lr_correct/(i+1):.4f},{bert_correct/(i+1):.4f},{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}\n")
         except:
             try:
                 lr_decision = float(lr_decision.squeeze(0)[-1].item())
                 bert_decision = float(bert_decision.squeeze(0)[-1].item())
             except:
                 pass
-            f.write(f"{lr_pred},{bert_pred},{llama_pred},{item['label']},{lr_acted/(i+1):.4f},{bert_acted/(i+1):.4f},{lr_decision:.4f},{bert_decision:.4f},{lr_score/max(1,lr_acted):.4f},{bert_score/max(1,bert_acted):.4f},{lr_correct/(i+1):.4f},{bert_correct/(i+1):.4f},{llama_correct/max(1,llama_acted):.4f},{overall_correct/(i+1):.4f}\n")
+            f.write(f"{lr_pred},{bert_pred},{llm_pred},{item['label']},{lr_acted/(i+1):.4f},{bert_acted/(i+1):.4f},{lr_decision:.4f},{bert_decision:.4f},{lr_score/max(1,lr_acted):.4f},{bert_score/max(1,bert_acted):.4f},{lr_correct/(i+1):.4f},{bert_correct/(i+1):.4f},{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}\n")
         if i % 10 == 0:
             bar.set_description(f"{overall_correct/(i+1):.4f} | LR: {lr_update}:{lr_correct/(i+1):.4f} | {lr_score/max(1,lr_acted):.4f} , BERT: {bert_update}:{bert_correct/(i+1):.4f} | {bert_score/max(1,bert_acted):.4f} ")
     f.close()

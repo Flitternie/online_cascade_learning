@@ -29,7 +29,7 @@ def pipeline(data_module, data, wrappers, mu):
     for i, item in enumerate(data):
         text = item['text']
         model_preds = [-1 for _ in range(len(wrappers))]
-        llm_pred = -1, -1, -1
+        llm_pred = -1
         model_decisions = [-1. for _ in range(len(wrappers))]
 
         for j, wrapper in enumerate(wrappers):
@@ -38,6 +38,12 @@ def pipeline(data_module, data, wrappers, mu):
                 wrapper.model.cache_clear()
                 model_update[j] += 1
         
+        model_confidence_costs = [None for _ in range(len(wrappers))]
+        model_costs = [None for _ in range(len(wrappers))]
+        model_probs = [None for _ in range(len(wrappers))]
+        model_decaying_probs = [0 for _ in range(len(wrappers))]
+        model_actions = [1 for _ in range(len(wrappers))]
+
         # warm-up wrappers
         if min(model_update) < 10:
             llm_pred = int(item['llm_label'])
@@ -50,8 +56,6 @@ def pipeline(data_module, data, wrappers, mu):
 
             # warm-up wrappers, skip the first updates
             if min(model_update) > 2:
-                model_confidence_costs = [None for _ in range(len(wrappers))]
-                model_costs = [None for _ in range(len(wrappers))]
                 for j, wrapper in enumerate(wrappers):
                     decision, prob = wrapper(text)
                     model_decisions[j] = decision
@@ -59,15 +63,16 @@ def pipeline(data_module, data, wrappers, mu):
                     model_preds[j] = pred
                     if int(pred) == item['label']:
                         model_correct[j] += 1
-                    wrapper_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to('cuda')
-                    confidence_cost = mse_loss(decision, wrapper_right_decision) 
+                    # set the decision to 0 if the model prediction matches the LLM label and 1 otherwise
+                    model_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to('cuda')
+                    confidence_cost = mse_loss(decision, model_right_decision) 
                     confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
                     model_confidence_costs[j] = confidence_cost
                     model_costs[j] = (1 - decision.transpose(0,1)[-1]) * cre_loss(prob, torch.tensor([llm_pred]).to('cuda')) + decision.transpose(0,1)[-1] * wrapper.model.args.cost * mu
                 
                 total_cost = model_costs[0]
                 for j in range(1, len(wrappers)):
-                    total_cost += model_costs[j] * model_decisions[j].transpose(0,1)[-1]
+                    total_cost += model_costs[j] * model_decisions[j-1].transpose(0,1)[-1]
                 for j in range(len(wrappers)):
                     model_confidence_costs[j].backward(retain_graph=True)
                 total_cost.backward()
@@ -95,11 +100,6 @@ def pipeline(data_module, data, wrappers, mu):
             continue
 
         # online learning process after warmup
-        model_probs = [None for _ in range(len(wrappers))]
-        model_confidence_costs = [None for _ in range(len(wrappers))]
-        model_costs = [None for _ in range(len(wrappers))]
-        model_decaying_probs = [0 for _ in range(len(wrappers))]
-        model_actions = [1 for _ in range(len(wrappers))]
         for j, wrapper in enumerate(wrappers):
             decision, prob = wrapper(text)
             pred = torch.argmax(prob, dim=-1).item()
@@ -135,6 +135,7 @@ def pipeline(data_module, data, wrappers, mu):
             
             for j, wrapper in enumerate(wrappers):
                 wrapper.model.cache_add(text, llm_pred)
+                # increment decision_correct if the model's prediction is correct and it took an action
                 model_decision_correct[j] += int(int(model_preds[j]) == llm_pred) ^ int(model_actions[j] != 0)
                 model_right_decision = torch.tensor([min(int(int(model_preds[j]) != llm_pred) + wrapper.calibration, 1.0)]).float().unsqueeze(0).to('cuda')
                 model_confidence_cost = mse_loss(model_decisions[j], model_right_decision)
@@ -146,7 +147,7 @@ def pipeline(data_module, data, wrappers, mu):
 
             total_cost = model_costs[0]
             for j in range(1, len(wrappers)):
-                total_cost += model_costs[j] * model_decisions[j].transpose(0,1)[-1]
+                total_cost += model_costs[j] * model_decisions[j-1].transpose(0,1)[-1]
             for j in range(len(wrappers)):
                 model_confidence_costs[j].backward(retain_graph=True)
             total_cost.backward()
@@ -182,7 +183,7 @@ def pipeline(data_module, data, wrappers, mu):
             description = ''''''
             description += f"{overall_correct/(i+1):.4f} |"
             for j, wrapper in enumerate(wrappers):
-                description += f"{wrapper.name} {model_update[j]}:{model_correct[j]/(i+1):.4f},"
+                description += f" {wrapper.name}: {model_update[j]}:{model_correct[j]/(i+1):.4f},"
                 description += f"{model_score[j]/max(1,model_acted[j]):.4f} |"
             bar.set_description(description)
     f.close()

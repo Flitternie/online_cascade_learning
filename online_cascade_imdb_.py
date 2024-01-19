@@ -67,7 +67,7 @@ def main(mu):
     bert_base_config.cache_size = 16
     bert_base_config.batch_size = 8
     bert_base_config.num_epochs = 5
-    bert_base_config.cost = 3 #340M for bert-large
+    bert_base_config.cost = 63 #340M for bert-large
     bert_base_model = bert.BertModel(bert_base_config)
     
     bert_base_wrapper = ModelWrapper(bert_base_model, bert_base_model.args)
