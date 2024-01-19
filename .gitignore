@@ -3,10 +3,13 @@
 *.pdf
 *.txt
 *.pyc
+*.zip
 extensions.json
 misc.ipynb
 
 /__pycache__
 /.vscode
 /data
-/models
+/logs
+/misc
+/*results

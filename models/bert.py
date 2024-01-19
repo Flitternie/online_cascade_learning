@@ -1,14 +1,8 @@
-import os
 import torch
 import torch.nn as nn
-import numpy as np
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from tqdm import tqdm
-import argparse
-
-import datasets
-from torch.utils.data import DataLoader, random_split
-
+from torch.utils.data import DataLoader
 from utils import *
 
 class BertModel():
@@ -123,12 +117,14 @@ class BertModel():
 
     def inference(self, dataloader: DataLoader) -> torch.tensor:
         self.model.eval()
+        probs = torch.tensor([]).to('cuda')
         with torch.no_grad():
             for step, batch in enumerate(tqdm(dataloader)):
                 encoded_text = self.tokenizer.batch_encode_plus(batch[0], padding='max_length', max_length=self.args.max_length, truncation=True, return_tensors='pt')
                 encoded_text = encoded_text.to('cuda')
                 logits = self.model(**encoded_text).logits
-                probs = nn.functional.softmax(logits, dim=-1)
+                prob = nn.functional.softmax(logits, dim=-1)
+                probs = torch.cat((probs, prob))
         return probs
 
     def evaluate(self, dataloader: DataLoader) -> tuple[torch.tensor, float]:

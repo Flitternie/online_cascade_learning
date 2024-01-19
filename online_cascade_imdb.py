@@ -1,9 +1,10 @@
 import datasets
 import numpy as np
 import argparse
+import importlib
 
-import lr
-import bert
+import models.lr as lr
+import models.bert as bert
 
 from utils import *
 from cascades.online_pipeline import *
@@ -67,13 +68,6 @@ def main(mu):
     bert_wrapper.decaying_factor = 0.95
     bert_wrapper.calibration = 0.3
     bert_wrapper.to('cuda')
-
-    # llama_config = ModelArguments()
-    # llama_config.model = "meta-llama/Llama-2-7b-chat-hf"
-    # llama_config.temperature = 0.3
-    # llama_config.max_new_tokens = 100
-    # llama_config.top_k = 5
-    # llama_model = llama.LlamaModel(llama_config)
 
     pipeline(data_module, data, lr_wrapper, bert_wrapper, mu)
 

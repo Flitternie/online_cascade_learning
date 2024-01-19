@@ -1,9 +1,10 @@
 import datasets
 import numpy as np
 import argparse
+import importlib
 
-import lr
-import bert
+import models.lr as lr
+import models.bert as bert
 
 from utils import *
 from cascades.online_pipeline import *
@@ -14,28 +15,28 @@ def main(mu):
     data_module = importlib.import_module(data_env)
     
     set_seed(42)
-    data = datasets.load_from_disk("./data/hatespeech")
+    data = datasets.load_dataset("hate_speech18")['train']
 
-    llama_labels = open("./llama_results/10000_sampled_hatespeech18_llama.txt", "r").readlines()
-    llama_labels = [int(l.strip()) for l in llama_labels]
+    llm_labels = open("./gpt_results/gpt3.5/hatespeech_gpt3.5_turbo_1106.txt", "r").readlines()
+    llm_labels = [int(data_module.postprocess(l.strip())) for l in llm_labels]
     total, correct = 0, 0
     for i, d in enumerate(data):
-        if data[i]['label'] == llama_labels[i]:
+        if data[i]['label'] == llm_labels[i]:
             correct += 1
         total += 1
-    print(f"LLAMA Accuracy: {correct/total}")
+    print(f"LLM Accuracy: {correct/total}")
     
     def update_labels(example, idx):
-        example['llm_label'] = llama_labels[idx]
+        example['llm_label'] = llm_labels[idx]
         return example
     
     data = data.map(update_labels, with_indices=True)
     total, correct = 0, 0
     for i, d in enumerate(data):
-        if data[i]['llm_label'] == llama_labels[i]:
+        if data[i]['llm_label'] == llm_labels[i]:
             correct += 1
         total += 1
-    print(f"LLAMA Accuracy: {correct/total}")
+    print(f"LLM Accuracy: {correct/total}") # should be 1.0
 
     # split data into train and test
     data = data.train_test_split(test_size=0.5)
@@ -43,7 +44,7 @@ def main(mu):
     data = data['test'].shuffle()
 
     lr_config = ModelArguments()
-    lr_config.num_labels = 4
+    lr_config.num_labels = 2
     lr_config.cache_size = 8
     lr_config.cost = 1 #110M for bert-base
     lr_model = lr.LogisticRegressionModelSkLearn(lr_config, data=data['text'])
@@ -56,7 +57,7 @@ def main(mu):
     lr_wrapper.to('cuda')
     
     bert_config = ModelArguments()
-    bert_config.num_labels = 4
+    bert_config.num_labels = 2
     bert_config.model = "bert-base-uncased"
     bert_config.cache_size = 16
     bert_config.batch_size = 8
@@ -70,13 +71,6 @@ def main(mu):
     bert_wrapper.decaying_factor = 0.95
     bert_wrapper.calibration = 0.3
     bert_wrapper.to('cuda')
-
-    # llama_config = ModelArguments()
-    # llama_config.model = "meta-llama/Llama-2-7b-chat-hf"
-    # llama_config.temperature = 0.3
-    # llama_config.max_new_tokens = 100
-    # llama_config.top_k = 5
-    # llama_model = llama.LlamaModel(llama_config)
 
     pipeline(data_module, data, lr_wrapper, bert_wrapper, mu)
 

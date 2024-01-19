@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoTokenizer, LlamaForCausalLM, LlamaForSequenceClassification
+from transformers import AutoTokenizer, LlamaForCausalLM
 from tqdm import tqdm
 from utils import *
 
