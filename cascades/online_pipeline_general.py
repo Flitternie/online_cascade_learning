@@ -10,7 +10,9 @@ def pipeline(data_module, data, wrappers, mu):
     # check if args.num_labels is the same for all wrappers
     assert len(set([wrapper.model.args.num_labels for wrapper in wrappers])) == 1
     print("Data loaded, #labels: ", wrappers[0].model.args.num_labels)
-    f = open(f"./logs/online_cascade_general/{data_module.DATASET}/{mu:.4f}.log", "w+")
+    wrapper_names = [wrapper.name for wrapper in wrappers]
+    f = open(f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.5f}.log", "w+")
+    print(f"Writing to ./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.5f}.log")
 
     model_correct = [0 for _ in range(len(wrappers))]
     model_score = [0 for _ in range(len(wrappers))]
@@ -29,7 +31,7 @@ def pipeline(data_module, data, wrappers, mu):
     for i, item in enumerate(data):
         text = item['text']
         model_preds = [-1 for _ in range(len(wrappers))]
-        llm_pred = -1, -1, -1
+        llm_pred = -1
         model_decisions = [-1. for _ in range(len(wrappers))]
 
         for j, wrapper in enumerate(wrappers):
@@ -38,6 +40,12 @@ def pipeline(data_module, data, wrappers, mu):
                 wrapper.model.cache_clear()
                 model_update[j] += 1
         
+        model_confidence_costs = [None for _ in range(len(wrappers))]
+        model_costs = [None for _ in range(len(wrappers))]
+        model_probs = [None for _ in range(len(wrappers))]
+        model_decaying_probs = [0 for _ in range(len(wrappers))]
+        model_actions = [1 for _ in range(len(wrappers))]
+
         # warm-up wrappers
         if min(model_update) < 10:
             llm_pred = int(item['llm_label'])
@@ -50,8 +58,6 @@ def pipeline(data_module, data, wrappers, mu):
 
             # warm-up wrappers, skip the first updates
             if min(model_update) > 2:
-                model_confidence_costs = [None for _ in range(len(wrappers))]
-                model_costs = [None for _ in range(len(wrappers))]
                 for j, wrapper in enumerate(wrappers):
                     decision, prob = wrapper(text)
                     model_decisions[j] = decision
@@ -59,15 +65,16 @@ def pipeline(data_module, data, wrappers, mu):
                     model_preds[j] = pred
                     if int(pred) == item['label']:
                         model_correct[j] += 1
-                    wrapper_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to('cuda')
-                    confidence_cost = mse_loss(decision, wrapper_right_decision) 
+                    # set the decision to 0 if the model prediction matches the LLM label and 1 otherwise
+                    model_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to('cuda')
+                    confidence_cost = mse_loss(decision, model_right_decision) 
                     confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
                     model_confidence_costs[j] = confidence_cost
                     model_costs[j] = (1 - decision.transpose(0,1)[-1]) * cre_loss(prob, torch.tensor([llm_pred]).to('cuda')) + decision.transpose(0,1)[-1] * wrapper.model.args.cost * mu
                 
                 total_cost = model_costs[0]
                 for j in range(1, len(wrappers)):
-                    total_cost += model_costs[j] * model_decisions[j].transpose(0,1)[-1]
+                    total_cost += model_costs[j] * model_decisions[j-1].transpose(0,1)[-1]
                 for j in range(len(wrappers)):
                     model_confidence_costs[j].backward(retain_graph=True)
                 total_cost.backward()
@@ -95,11 +102,6 @@ def pipeline(data_module, data, wrappers, mu):
             continue
 
         # online learning process after warmup
-        model_probs = [None for _ in range(len(wrappers))]
-        model_confidence_costs = [None for _ in range(len(wrappers))]
-        model_costs = [None for _ in range(len(wrappers))]
-        model_decaying_probs = [0 for _ in range(len(wrappers))]
-        model_actions = [1 for _ in range(len(wrappers))]
         for j, wrapper in enumerate(wrappers):
             decision, prob = wrapper(text)
             pred = torch.argmax(prob, dim=-1).item()
@@ -108,7 +110,7 @@ def pipeline(data_module, data, wrappers, mu):
             model_preds[j] = pred
             if int(pred) == item['label']:
                 model_correct[j] += 1
-            # decay the probability of proceeding to the next level
+            # decay the probability of proceeding to the next level, set to higher values for less capable models, range [0,1)
             model_decayed_prob = wrapper.decaying_factor ** (model_update[j])
             model_decaying_probs[j] = model_decayed_prob
             model_action = (decision.item() > 0.5)
@@ -135,7 +137,9 @@ def pipeline(data_module, data, wrappers, mu):
             
             for j, wrapper in enumerate(wrappers):
                 wrapper.model.cache_add(text, llm_pred)
+                # increment decision_correct if the model's prediction is correct and it took an action
                 model_decision_correct[j] += int(int(model_preds[j]) == llm_pred) ^ int(model_actions[j] != 0)
+                # wrapper.calibration is to adjust the model prediction's confidence, set to higher values for less capable models, range [0,0.5)
                 model_right_decision = torch.tensor([min(int(int(model_preds[j]) != llm_pred) + wrapper.calibration, 1.0)]).float().unsqueeze(0).to('cuda')
                 model_confidence_cost = mse_loss(model_decisions[j], model_right_decision)
                 model_confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
@@ -146,7 +150,7 @@ def pipeline(data_module, data, wrappers, mu):
 
             total_cost = model_costs[0]
             for j in range(1, len(wrappers)):
-                total_cost += model_costs[j] * model_decisions[j].transpose(0,1)[-1]
+                total_cost += model_costs[j] * model_decisions[j-1].transpose(0,1)[-1]
             for j in range(len(wrappers)):
                 model_confidence_costs[j].backward(retain_graph=True)
             total_cost.backward()
@@ -182,7 +186,7 @@ def pipeline(data_module, data, wrappers, mu):
             description = ''''''
             description += f"{overall_correct/(i+1):.4f} |"
             for j, wrapper in enumerate(wrappers):
-                description += f"{wrapper.name} {model_update[j]}:{model_correct[j]/(i+1):.4f},"
+                description += f" {wrapper.name}: {model_update[j]}:{model_correct[j]/(i+1):.4f},"
                 description += f"{model_score[j]/max(1,model_acted[j]):.4f} |"
             bar.set_description(description)
     f.close()

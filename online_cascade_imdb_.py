@@ -37,7 +37,7 @@ def main(mu):
         if data[i]['llm_label'] == llm_labels[i]:
             correct += 1
         total += 1
-    print(f"LLM Accuracy: {correct/total}") # should be 1.0
+    assert correct/total == 1.0 # should be 1.0
 
     # split data into train and test
     data = data.shuffle()
@@ -56,8 +56,8 @@ def main(mu):
     lr_wrapper.name = "LR"
     lr_wrapper.learning_rate = 0.0007
     lr_wrapper.regularization = 0.0001
-    lr_wrapper.decaying_factor = 0.97
-    lr_wrapper.calibration = 0.3
+    lr_wrapper.decaying_factor = 0.98
+    lr_wrapper.calibration = 0.4
     lr_wrapper.to('cuda')
     wrappers.append(lr_wrapper)
     
@@ -67,11 +67,11 @@ def main(mu):
     bert_base_config.cache_size = 16
     bert_base_config.batch_size = 8
     bert_base_config.num_epochs = 5
-    bert_base_config.cost = 3 #340M for bert-large
+    bert_base_config.cost = 63 #340M for bert-large
     bert_base_model = bert.BertModel(bert_base_config)
     
     bert_base_wrapper = ModelWrapper(bert_base_model, bert_base_model.args)
-    bert_base_wrapper.name = "BERT"
+    bert_base_wrapper.name = "BERT-base"
     bert_base_wrapper.learning_rate = 0.0007
     bert_base_wrapper.regularization = 0.0001
     bert_base_wrapper.decaying_factor = 0.95
@@ -89,6 +89,7 @@ def main(mu):
     # bert_large_model = bert.BertModel(bert_large_config)
 
     # bert_large_wrapper = ModelWrapper(bert_large_model, bert_large_model.args)
+    # bert_large_wrapper.name = "BERT-large"
     # bert_large_wrapper.learning_rate = 0.0007
     # bert_large_wrapper.regularization = 0.0001
     # bert_large_wrapper.decaying_factor = 0.93
@@ -102,5 +103,5 @@ def main(mu):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    for mu in np.arange(0.0001, 0.001, 0.0001):
+    for mu in np.arange(0.00001, 0.0002, 0.00002):
         main(mu)
