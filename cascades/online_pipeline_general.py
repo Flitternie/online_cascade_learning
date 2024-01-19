@@ -33,7 +33,7 @@ def pipeline(data_module, data, wrappers, mu):
         model_decisions = [-1. for _ in range(len(wrappers))]
 
         for j, wrapper in enumerate(wrappers):
-            if len(wrapper.model.online_cache['label']) == wrapper.model.args.cache_size:
+            if len(wrapper.model.online_cache['llm_label']) == wrapper.model.args.cache_size:
                 wrapper.model.train_online(wrapper.model.online_cache)
                 wrapper.model.cache_clear()
                 model_update[j] += 1

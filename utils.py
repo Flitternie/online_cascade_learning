@@ -7,7 +7,10 @@ class GenericDataset(Dataset):
     def __init__(self, data: dict):
         self.data = data
         self.text = data['text']
-        self.labels = data['label']
+        try:
+            self.labels = data['label']
+        except:
+            self.labels = data['llm_label']
         try:
             self.llm_labels = data['llm_label']
         except:

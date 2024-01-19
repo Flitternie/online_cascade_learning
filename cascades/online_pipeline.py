@@ -29,11 +29,11 @@ def pipeline(data_module, data, lr_wrapper, bert_wrapper, mu):
         lr_pred, bert_pred, llama_pred = -1, -1, -1
         lr_decision, bert_decision = -1., -1.
 
-        if len(lr_wrapper.model.online_cache['label']) == lr_wrapper.model.args.cache_size:
+        if len(lr_wrapper.model.online_cache['llm_label']) == lr_wrapper.model.args.cache_size:
             lr_wrapper.model.train(lr_wrapper.model.online_cache)
             lr_wrapper.model.cache_clear()
             lr_update += 1
-        if len(bert_wrapper.model.online_cache['label']) == bert_wrapper.model.args.cache_size:
+        if len(bert_wrapper.model.online_cache['llm_label']) == bert_wrapper.model.args.cache_size:
             bert_wrapper.model.train_online(bert_wrapper.model.online_cache)
             bert_wrapper.model.cache_clear()
             bert_update += 1

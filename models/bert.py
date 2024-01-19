@@ -12,7 +12,7 @@ class BertModel():
         self.model = AutoModelForSequenceClassification.from_pretrained(self.args.model, num_labels=self.args.num_labels)
         self.model = self.model.to('cuda')
         self.args.max_length = self.tokenizer.model_max_length
-        self.online_cache = {"text": [], "label": []}
+        self.online_cache = {"text": [], "llm_label": []}
         if "class_weight" in dir(self.args):
             self.class_weight = self.args.class_weight
             self.class_count = [0 for _ in range(self.args.num_labels)]
@@ -26,10 +26,10 @@ class BertModel():
     
     def cache_add(self, text: str, label: int) -> None:
         self.online_cache["text"].append(text)
-        self.online_cache["label"].append(label)
+        self.online_cache["llm_label"].append(label)
     
     def cache_clear(self) -> None:
-        self.online_cache = {"text": [], "label": []}
+        self.online_cache = {"text": [], "llm_label": []}
 
     def train(self, train_dataloader: DataLoader, val_dataloader: DataLoader) -> None:
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
