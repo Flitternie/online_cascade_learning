@@ -39,9 +39,9 @@ def main(mu):
     print(f"LLM Accuracy: {correct/total}") # should be 1.0
 
     # split data into train and test
+    data = data.shuffle()
     data = data.train_test_split(test_size=0.5)
-
-    data = data['test'].shuffle()
+    data = data['test']
 
     lr_config = ModelArguments()
     lr_config.num_labels = 2

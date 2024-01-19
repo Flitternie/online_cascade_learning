@@ -40,6 +40,9 @@ class LogisticRegressionModelSkLearn():
         train_data_vector = self.vectorizer.transform(train_data['text'])
         self.model.partial_fit(train_data_vector, train_data['llm_label'], classes=np.arange(self.args.num_labels))
     
+    def train_online(self, train_data: dict) -> None:
+        self.train(train_data)
+
     def inference(self, data: dict):
         test_data = self.vectorizer.transform(data['text'])
         return self.model.predict_proba(test_data)

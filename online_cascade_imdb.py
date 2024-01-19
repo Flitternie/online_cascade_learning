@@ -15,30 +15,33 @@ def main(mu):
     data_module = importlib.import_module(data_env)
     
     set_seed(42)
-    data = datasets.load_from_disk("data/5000_sampled_imdb_test")
+    data = datasets.load_dataset("imdb")['train']
 
-    llama_labels = open("./llama_results/10000_sampled_imdb_llama.txt", "r").readlines()
-    llama_labels = [int(l.strip()) for l in llama_labels]
+    llm_labels = open("./gpt_results/gpt3.5/imdb_gpt3.5_turbo_1106.txt", "r").readlines()
+    llm_labels = [int(data_module.postprocess(l.strip())) for l in llama_labels]
     total, correct = 0, 0
     for i, d in enumerate(data):
-        if data[i]['label'] == llama_labels[i+5000]:
+        if data[i]['label'] == llm_labels[i]:
             correct += 1
         total += 1
-    print(f"LLAMA Accuracy: {correct/total}")
+    print(f"LLM Accuracy: {correct/total}")
     
     def update_labels(example, idx):
-        example['llm_label'] = llama_labels[idx+5000]
+        example['llm_label'] = llm_labels[idx]
         return example
     
     data = data.map(update_labels, with_indices=True)
     total, correct = 0, 0
     for i, d in enumerate(data):
-        if data[i]['llm_label'] == llama_labels[i+5000]:
+        if data[i]['llm_label'] == llm_labels[i]:
             correct += 1
         total += 1
-    print(f"LLAMA Accuracy: {correct/total}")
+    print(f"LLM Accuracy: {correct/total}") # should be 1.0
 
+    # split data into train and test
     data = data.shuffle()
+    data = data.train_test_split(test_size=0.5)
+    data = data['test']
 
     lr_config = ModelArguments()
     lr_config.num_labels = 2
