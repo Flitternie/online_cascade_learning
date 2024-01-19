@@ -8,7 +8,7 @@ import models.lr as lr
 import models.bert as bert
 
 from utils import *
-from cascades.online_pipeline import *
+from cascades.online_pipeline_general import *
         
 def main(mu):
     print("cost coefficient: ", mu)
@@ -44,36 +44,59 @@ def main(mu):
     data = data.train_test_split(test_size=0.5)
     data = data['test']
 
+    wrappers = []
+
     lr_config = ModelArguments()
     lr_config.num_labels = 2
     lr_config.cache_size = 8
     lr_config.cost = 1 #110M for bert-base
     lr_model = lr.LogisticRegressionModelSkLearn(lr_config, data=data['text'])
-    lr_wrapper = ModelWrapper(lr_model, lr_model.args)
     
+    lr_wrapper = ModelWrapper(lr_model, lr_model.args)
+    lr_wrapper.name = "LR"
     lr_wrapper.learning_rate = 0.0007
     lr_wrapper.regularization = 0.0001
     lr_wrapper.decaying_factor = 0.97
     lr_wrapper.calibration = 0.3
     lr_wrapper.to('cuda')
+    wrappers.append(lr_wrapper)
     
-    bert_config = ModelArguments()
-    bert_config.num_labels = 2
-    bert_config.model = "bert-base-uncased"
-    bert_config.cache_size = 16
-    bert_config.batch_size = 8
-    bert_config.num_epochs = 5
-    bert_config.cost = 63 #7B for llama2-7b
-    bert_model = bert.BertModel(bert_config)
+    bert_base_config = ModelArguments()
+    bert_base_config.num_labels = 2
+    bert_base_config.model = "bert-base-uncased"
+    bert_base_config.cache_size = 16
+    bert_base_config.batch_size = 8
+    bert_base_config.num_epochs = 5
+    bert_base_config.cost = 3 #340M for bert-large
+    bert_base_model = bert.BertModel(bert_base_config)
     
-    bert_wrapper = ModelWrapper(bert_model, bert_model.args)
-    bert_wrapper.learning_rate = 0.0007
-    bert_wrapper.regularization = 0.0001
-    bert_wrapper.decaying_factor = 0.95
-    bert_wrapper.calibration = 0.3
-    bert_wrapper.to('cuda')
+    bert_base_wrapper = ModelWrapper(bert_base_model, bert_base_model.args)
+    bert_base_wrapper.name = "BERT"
+    bert_base_wrapper.learning_rate = 0.0007
+    bert_base_wrapper.regularization = 0.0001
+    bert_base_wrapper.decaying_factor = 0.95
+    bert_base_wrapper.calibration = 0.3
+    bert_base_wrapper.to('cuda')
+    wrappers.append(bert_base_wrapper)
 
-    pipeline(data_module, data, lr_wrapper, bert_wrapper, mu)
+    # bert_large_config = ModelArguments()
+    # bert_large_config.num_labels = 2
+    # bert_large_config.model = "bert-large-uncased"
+    # bert_large_config.cache_size = 32
+    # bert_large_config.batch_size = 16
+    # bert_large_config.num_epochs = 5
+    # bert_large_config.cost = 63 #7B for llama2-7b
+    # bert_large_model = bert.BertModel(bert_large_config)
+
+    # bert_large_wrapper = ModelWrapper(bert_large_model, bert_large_model.args)
+    # bert_large_wrapper.learning_rate = 0.0007
+    # bert_large_wrapper.regularization = 0.0001
+    # bert_large_wrapper.decaying_factor = 0.93
+    # bert_large_wrapper.calibration = 0.3
+    # bert_large_wrapper.to('cuda')
+    # wrappers.append(bert_large_wrapper)
+
+    pipeline(data_module, data, wrappers, mu)
 
 
 if __name__ == "__main__":

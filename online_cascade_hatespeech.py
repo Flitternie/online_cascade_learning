@@ -1,4 +1,5 @@
 import datasets
+import pandas as pd
 import numpy as np
 import argparse
 import importlib
@@ -15,7 +16,7 @@ def main(mu):
     data_module = importlib.import_module(data_env)
     
     set_seed(42)
-    data = datasets.load_dataset("hate_speech18")['train']
+    data = datasets.Dataset.from_pandas(pd.read_csv("./data/hatespeech_preprocessed.csv"))
 
     llm_labels = open("./gpt_results/gpt3.5/hatespeech_gpt3.5_turbo_1106.txt", "r").readlines()
     llm_labels = [int(data_module.postprocess(l.strip())) for l in llm_labels]
@@ -48,8 +49,8 @@ def main(mu):
     lr_config.cache_size = 8
     lr_config.cost = 1 #110M for bert-base
     lr_model = lr.LogisticRegressionModelSkLearn(lr_config, data=data['text'])
-    lr_wrapper = ModelWrapper(lr_model, lr_model.args)
     
+    lr_wrapper = ModelWrapper(lr_model, lr_model.args)
     lr_wrapper.learning_rate = 0.0007
     lr_wrapper.regularization = 0.0001
     lr_wrapper.decaying_factor = 0.97

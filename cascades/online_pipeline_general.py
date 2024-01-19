@@ -10,7 +10,7 @@ def pipeline(data_module, data, wrappers, mu):
     # check if args.num_labels is the same for all wrappers
     assert len(set([wrapper.model.args.num_labels for wrapper in wrappers])) == 1
     print("Data loaded, #labels: ", wrappers[0].model.args.num_labels)
-    f = open(f"./logs/online_cascade/{data_module.DATASET}/{mu:.4f}.log", "w+")
+    f = open(f"./logs/online_cascade_general/{data_module.DATASET}/{mu:.4f}.log", "w+")
 
     model_correct = [0 for _ in range(len(wrappers))]
     model_score = [0 for _ in range(len(wrappers))]
@@ -117,7 +117,7 @@ def pipeline(data_module, data, wrappers, mu):
         llm_flag = True
         for j, wrapper in enumerate(wrappers):
             # stop proceeding to the next level if the model has already acted
-            if model_action[j] == 0 and np.random.choice([False,True], p=[model_decaying_probs[j], 1-model_decaying_probs[j]]):
+            if model_actions[j] == 0 and np.random.choice([False,True], p=[model_decaying_probs[j], 1-model_decaying_probs[j]]):
                 if int(model_preds[j]) == item['label']:
                     model_score[j] += 1
                     overall_correct += 1
@@ -135,7 +135,7 @@ def pipeline(data_module, data, wrappers, mu):
             
             for j, wrapper in enumerate(wrappers):
                 wrapper.model.cache_add(text, llm_pred)
-                model_decision_correct[j] += int(int(model_preds[j]) == llm_pred) ^ int(model_action[j] != 0)
+                model_decision_correct[j] += int(int(model_preds[j]) == llm_pred) ^ int(model_actions[j] != 0)
                 model_right_decision = torch.tensor([min(int(int(model_preds[j]) != llm_pred) + wrapper.calibration, 1.0)]).float().unsqueeze(0).to('cuda')
                 model_confidence_cost = mse_loss(model_decisions[j], model_right_decision)
                 model_confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
@@ -180,9 +180,9 @@ def pipeline(data_module, data, wrappers, mu):
         
         if i % 10 == 0:
             description = ''''''
-            output += f"{overall_correct/(i+1):.4f} |"
+            description += f"{overall_correct/(i+1):.4f} |"
             for j, wrapper in enumerate(wrappers):
-                output += f"{wrapper.name} {model_update[j]}:{model_correct[j]/(i+1):.4f},"
-                output += f"{model_score[j]/max(1,model_acted[j]):.4f} |"
+                description += f"{wrapper.name} {model_update[j]}:{model_correct[j]/(i+1):.4f},"
+                description += f"{model_score[j]/max(1,model_acted[j]):.4f} |"
             bar.set_description(description)
     f.close()
