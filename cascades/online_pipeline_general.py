@@ -66,11 +66,11 @@ def pipeline(data_module, data, wrappers, mu):
                     if int(pred) == item['label']:
                         model_correct[j] += 1
                     # set the decision to 0 if the model prediction matches the LLM label and 1 otherwise
-                    model_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to('cuda')
+                    model_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to(wrapper.device)
                     confidence_cost = mse_loss(decision, model_right_decision) 
                     confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
                     model_confidence_costs[j] = confidence_cost
-                    model_costs[j] = (1 - decision.transpose(0,1)[-1]) * cre_loss(prob, torch.tensor([llm_pred]).to('cuda')) + decision.transpose(0,1)[-1] * wrapper.model.args.cost * mu
+                    model_costs[j] = (1 - decision.transpose(0,1)[-1]) * cre_loss(prob, torch.tensor([llm_pred]).to(wrapper.device)) + decision.transpose(0,1)[-1] * wrapper.model.args.cost * mu
                 
                 total_cost = model_costs[0]
                 for j in range(1, len(wrappers)):
@@ -140,12 +140,12 @@ def pipeline(data_module, data, wrappers, mu):
                 # increment decision_correct if the model's prediction is correct and it took an action
                 model_decision_correct[j] += int(int(model_preds[j]) == llm_pred) ^ int(model_actions[j] != 0)
                 # wrapper.calibration is to adjust the model prediction's confidence, set to higher values for less capable models, range [0,0.5)
-                model_right_decision = torch.tensor([min(int(int(model_preds[j]) != llm_pred) + wrapper.calibration, 1.0)]).float().unsqueeze(0).to('cuda')
+                model_right_decision = torch.tensor([min(int(int(model_preds[j]) != llm_pred) + wrapper.calibration, 1.0)]).float().unsqueeze(0).to(wrapper.device)
                 model_confidence_cost = mse_loss(model_decisions[j], model_right_decision)
                 model_confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
                 model_confidence_costs[j] = model_confidence_cost
 
-                model_cost = (1 - model_decisions[j].transpose(0,1)[-1]) * cre_loss(model_probs[j], torch.tensor([llm_pred]).to('cuda')) + model_decisions[j].transpose(0,1)[-1] * wrapper.model.args.cost * mu
+                model_cost = (1 - model_decisions[j].transpose(0,1)[-1]) * cre_loss(model_probs[j], torch.tensor([llm_pred]).to(wrapper.device)) + model_decisions[j].transpose(0,1)[-1] * wrapper.model.args.cost * mu
                 model_costs[j] = model_cost
 
             total_cost = model_costs[0]

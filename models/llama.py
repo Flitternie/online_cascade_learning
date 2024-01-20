@@ -6,10 +6,11 @@ from utils import *
 class LlamaModel():
     def __init__(self, args: ModelArguments):
         self.args = args
+        self.device = args.device
         self.tokenizer = AutoTokenizer.from_pretrained(args.model)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model = LlamaForCausalLM.from_pretrained(args.model) 
-        self.model = self.model.to('cuda')
+        self.model = self.model.to(self.device)
         print("Llama Model loaded")
 
     def inference(self, dataloader: DataLoader) -> list[str]:
@@ -18,7 +19,7 @@ class LlamaModel():
         print("Starting inference...")
         for batch in tqdm(dataloader):
             batch = self.tokenizer.batch_encode_plus(batch, padding=True, return_tensors='pt')
-            batch = batch.to('cuda')
+            batch = batch.to(self.device)
             input_length = batch['input_ids'].shape[1]
             output = self.model.generate(
                 **batch, 
@@ -33,7 +34,7 @@ class LlamaModel():
         return original_outputs
 
     def predict(self, input: str) -> tuple[str, float]:
-        input = self.tokenizer.encode_plus(input, return_tensors='pt').to('cuda')
+        input = self.tokenizer.encode_plus(input, return_tensors='pt').to(self.device)
         input_length = input['input_ids'].shape[1]
         output = self.model.generate(
             **input, 

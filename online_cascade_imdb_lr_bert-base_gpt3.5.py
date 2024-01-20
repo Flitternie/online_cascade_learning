@@ -49,7 +49,8 @@ def main(mu):
     lr_config = ModelArguments()
     lr_config.num_labels = 2
     lr_config.cache_size = 8
-    lr_config.cost = 1 #110M for bert-base
+    lr_config.cost = 1 # 110M for bert-base
+    lr_config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     lr_model = lr.LogisticRegressionModelSkLearn(lr_config, data=data['text'])
     
     lr_wrapper = ModelWrapper(lr_model, lr_model.args)
@@ -58,7 +59,7 @@ def main(mu):
     lr_wrapper.regularization = 0.0001
     lr_wrapper.decaying_factor = 0.97
     lr_wrapper.calibration = 0.4
-    lr_wrapper.to('cuda')
+    lr_wrapper.to(lr_wrapper.device)
     wrappers.append(lr_wrapper)
     
     bert_base_config = ModelArguments()
@@ -67,7 +68,8 @@ def main(mu):
     bert_base_config.cache_size = 16
     bert_base_config.batch_size = 8
     bert_base_config.num_epochs = 5
-    bert_base_config.cost = 1182 #130B for GPT-3
+    bert_base_config.cost = 1182 # 130B for GPT-3
+    bert_base_config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     bert_base_model = bert.BertModel(bert_base_config)
     
     bert_base_wrapper = ModelWrapper(bert_base_model, bert_base_model.args)
@@ -76,7 +78,7 @@ def main(mu):
     bert_base_wrapper.regularization = 0.0001
     bert_base_wrapper.decaying_factor = 0.95
     bert_base_wrapper.calibration = 0.3
-    bert_base_wrapper.to('cuda')
+    bert_base_wrapper.to(bert_base_wrapper.device) 
     wrappers.append(bert_base_wrapper)
 
     pipeline(data_module, data, wrappers, mu)

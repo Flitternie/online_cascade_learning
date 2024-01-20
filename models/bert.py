@@ -8,9 +8,10 @@ from utils import *
 class BertModel():
     def __init__(self, args: ModelArguments) -> None:
         self.args = args
+        self.device = args.device
         self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
         self.model = AutoModelForSequenceClassification.from_pretrained(self.args.model, num_labels=self.args.num_labels)
-        self.model = self.model.to('cuda')
+        self.model = self.model.to(self.device)
         self.args.max_length = self.tokenizer.model_max_length
         self.online_cache = {"text": [], "llm_label": []}
         if "class_weight" in dir(self.args):
@@ -22,7 +23,7 @@ class BertModel():
         # clean up GPU memory and reload model
         torch.cuda.empty_cache()
         self.model = AutoModelForSequenceClassification.from_pretrained(self.args.model, num_labels=self.args.num_labels)
-        self.model = self.model.to('cuda')
+        self.model = self.model.to(self.device)
     
     def cache_add(self, text: str, label: int) -> None:
         self.online_cache["text"].append(text)
@@ -57,11 +58,11 @@ class BertModel():
             pbar = tqdm(train_dataloader)
             for step, batch in enumerate(pbar):
                 encoded_text = self.tokenizer.batch_encode_plus(batch[0], padding='max_length', max_length=self.args.max_length, truncation=True, return_tensors='pt')
-                encoded_text = encoded_text.to('cuda')
-                true_labels = batch[-1].to('cuda')
+                encoded_text = encoded_text.to(self.device)
+                true_labels = batch[-1].to(self.device)
                 outputs = self.model(**encoded_text, labels=true_labels)
                 if self.class_weight is not None:
-                    loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(list(self.class_weight.values()), dtype=torch.float32).to('cuda'))
+                    loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(list(self.class_weight.values()), dtype=torch.float32).to(self.device))
                     loss = loss_fct(outputs.logits.view(-1, self.args.num_labels), true_labels.view(-1))
                 else:
                     loss = outputs.loss
@@ -101,12 +102,12 @@ class BertModel():
         for epoch in range(self.args.num_epochs):
             for step, batch in enumerate(data):
                 encoded_text = self.tokenizer.batch_encode_plus(batch[0], padding='max_length', max_length=self.args.max_length, truncation=True, return_tensors='pt')
-                encoded_text = encoded_text.to('cuda')
-                true_labels = batch[1].to('cuda')
+                encoded_text = encoded_text.to(self.device)
+                true_labels = batch[1].to(self.device)
                 outputs = self.model(**encoded_text, labels=true_labels)
                 logits = nn.functional.softmax(outputs.logits, dim=-1)
                 if "class_weight" in dir(self.args):
-                    loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(list(self.class_weight.values()), dtype=torch.float32).to('cuda'))
+                    loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(list(self.class_weight.values()), dtype=torch.float32).to(self.device))
                 else:
                     loss_fct = nn.CrossEntropyLoss(reduction='none')
                 loss = loss_fct(outputs.logits.view(-1, self.args.num_labels), true_labels.view(-1))
@@ -117,11 +118,11 @@ class BertModel():
 
     def inference(self, dataloader: DataLoader) -> torch.tensor:
         self.model.eval()
-        probs = torch.tensor([]).to('cuda')
+        probs = torch.tensor([]).to(self.device)
         with torch.no_grad():
             for step, batch in enumerate(tqdm(dataloader)):
                 encoded_text = self.tokenizer.batch_encode_plus(batch[0], padding='max_length', max_length=self.args.max_length, truncation=True, return_tensors='pt')
-                encoded_text = encoded_text.to('cuda')
+                encoded_text = encoded_text.to(self.device)
                 logits = self.model(**encoded_text).logits
                 prob = nn.functional.softmax(logits, dim=-1)
                 probs = torch.cat((probs, prob))
@@ -129,15 +130,15 @@ class BertModel():
 
     def evaluate(self, dataloader: DataLoader) -> tuple[torch.tensor, float]:
         correct, total = 0, 0
-        outputs = torch.tensor([]).to('cuda')
+        outputs = torch.tensor([]).to(self.device)
         with torch.no_grad():
             for step, batch in enumerate(tqdm(dataloader)):
                 encoded_text = self.tokenizer.batch_encode_plus(batch[0], padding='max_length', max_length=self.args.max_length, truncation=True, return_tensors='pt')
-                encoded_text = encoded_text.to('cuda')
+                encoded_text = encoded_text.to(self.device)
                 # compute accuracy
                 logits = self.model(**encoded_text).logits
                 predictions = torch.argmax(logits, dim=-1)
-                true_labels = batch[1].to('cuda')
+                true_labels = batch[1].to(self.device)
                 correct += (predictions == true_labels).sum().item()
                 total += len(true_labels)
                 outputs = torch.cat((outputs, predictions))
@@ -147,7 +148,7 @@ class BertModel():
         self.model.eval()
         with torch.no_grad():
             input = self.tokenizer.encode_plus(input, padding='max_length', max_length=self.args.max_length, truncation=True, return_tensors='pt')
-            input = input.to('cuda')
+            input = input.to(self.device)
             logits = self.model(**input).logits
             probs = nn.functional.softmax(logits, dim=-1)
         return probs
