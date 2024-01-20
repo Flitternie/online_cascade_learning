@@ -56,7 +56,7 @@ def main(mu):
     lr_wrapper.name = "LR"
     lr_wrapper.learning_rate = 0.0007
     lr_wrapper.regularization = 0.0001
-    lr_wrapper.decaying_factor = 0.98
+    lr_wrapper.decaying_factor = 0.99
     lr_wrapper.calibration = 0.4
     lr_wrapper.to('cuda')
     wrappers.append(lr_wrapper)
@@ -67,35 +67,35 @@ def main(mu):
     bert_base_config.cache_size = 16
     bert_base_config.batch_size = 8
     bert_base_config.num_epochs = 5
-    bert_base_config.cost = 63 #340M for bert-large
+    bert_base_config.cost = 3 #340M for bert-large
     bert_base_model = bert.BertModel(bert_base_config)
     
     bert_base_wrapper = ModelWrapper(bert_base_model, bert_base_model.args)
     bert_base_wrapper.name = "BERT-base"
     bert_base_wrapper.learning_rate = 0.0007
     bert_base_wrapper.regularization = 0.0001
-    bert_base_wrapper.decaying_factor = 0.95
-    bert_base_wrapper.calibration = 0.3
+    bert_base_wrapper.decaying_factor = 0.97
+    bert_base_wrapper.calibration = 0.35
     bert_base_wrapper.to('cuda')
     wrappers.append(bert_base_wrapper)
 
-    # bert_large_config = ModelArguments()
-    # bert_large_config.num_labels = 2
-    # bert_large_config.model = "bert-large-uncased"
-    # bert_large_config.cache_size = 32
-    # bert_large_config.batch_size = 16
-    # bert_large_config.num_epochs = 5
-    # bert_large_config.cost = 63 #7B for llama2-7b
-    # bert_large_model = bert.BertModel(bert_large_config)
+    bert_large_config = ModelArguments()
+    bert_large_config.num_labels = 2
+    bert_large_config.model = "bert-large-uncased"
+    bert_large_config.cache_size = 32
+    bert_large_config.batch_size = 16
+    bert_large_config.num_epochs = 5
+    bert_large_config.cost = 382 #130B for GPT-3
+    bert_large_model = bert.BertModel(bert_large_config)
 
-    # bert_large_wrapper = ModelWrapper(bert_large_model, bert_large_model.args)
-    # bert_large_wrapper.name = "BERT-large"
-    # bert_large_wrapper.learning_rate = 0.0007
-    # bert_large_wrapper.regularization = 0.0001
-    # bert_large_wrapper.decaying_factor = 0.93
-    # bert_large_wrapper.calibration = 0.3
-    # bert_large_wrapper.to('cuda')
-    # wrappers.append(bert_large_wrapper)
+    bert_large_wrapper = ModelWrapper(bert_large_model, bert_large_model.args)
+    bert_large_wrapper.name = "BERT-large"
+    bert_large_wrapper.learning_rate = 0.0007
+    bert_large_wrapper.regularization = 0.0001
+    bert_large_wrapper.decaying_factor = 0.95
+    bert_large_wrapper.calibration = 0.3
+    bert_large_wrapper.to('cuda')
+    wrappers.append(bert_large_wrapper)
 
     pipeline(data_module, data, wrappers, mu)
 
@@ -103,5 +103,5 @@ def main(mu):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    for mu in np.arange(0.00001, 0.0002, 0.00002):
+    for mu in np.arange(0.000001, 0.0001, 0.000001):
         main(mu)

@@ -11,8 +11,8 @@ def pipeline(data_module, data, wrappers, mu):
     assert len(set([wrapper.model.args.num_labels for wrapper in wrappers])) == 1
     print("Data loaded, #labels: ", wrappers[0].model.args.num_labels)
     wrapper_names = [wrapper.name for wrapper in wrappers]
-    f = open(f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.5f}.log", "w+")
-    print(f"Writing to ./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.5f}.log")
+    f = open(f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}.log", "w+")
+    print(f"Writing to ./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}.log")
 
     model_correct = [0 for _ in range(len(wrappers))]
     model_score = [0 for _ in range(len(wrappers))]
