@@ -11,8 +11,9 @@ def pipeline(data_module, data, wrappers, mu):
     assert len(set([wrapper.model.args.num_labels for wrapper in wrappers])) == 1
     print("Data loaded, #labels: ", wrappers[0].model.args.num_labels)
     wrapper_names = [wrapper.name for wrapper in wrappers]
-    f = open(f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}.log", "w+")
-    print(f"Writing to ./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}.log")
+    log_file = f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}.log"
+    f = open(log_file, "w+")
+    print(f"Writing to {log_file}")
 
     model_correct = [0 for _ in range(len(wrappers))]
     model_score = [0 for _ in range(len(wrappers))]
@@ -74,7 +75,11 @@ def pipeline(data_module, data, wrappers, mu):
                 
                 total_cost = model_costs[0]
                 for j in range(1, len(wrappers)):
-                    total_cost += model_costs[j] * model_decisions[j-1].transpose(0,1)[-1]
+                    k = j - 1
+                    while k >= 0: 
+                        model_costs[j] *= model_decisions[k].transpose(0,1)[-1]
+                        k -= 1
+                    total_cost += model_costs[j]
                 for j in range(len(wrappers)):
                     model_confidence_costs[j].backward(retain_graph=True)
                 total_cost.backward()
@@ -150,7 +155,11 @@ def pipeline(data_module, data, wrappers, mu):
 
             total_cost = model_costs[0]
             for j in range(1, len(wrappers)):
-                total_cost += model_costs[j] * model_decisions[j-1].transpose(0,1)[-1]
+                k = j - 1
+                while k >= 0: 
+                    model_costs[j] *= model_decisions[k].transpose(0,1)[-1]
+                    k -= 1
+                total_cost += model_costs[j]
             for j in range(len(wrappers)):
                 model_confidence_costs[j].backward(retain_graph=True)
             total_cost.backward()
