@@ -10,17 +10,19 @@ Prompt = '''The following claim was made: {} \n Was this claim true or false? Re
 PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
 
 def postprocess(output):
+    output = output.lower().strip()
     if "true" in output:
-        return "1"
+        return 1
     elif "false" in output:
-        return "0"
+        return 0
     else:
-        return output
+        return -1
     
 def postprocess2(output):
-    if "SUPPORTS" in output:
-        return "1"
-    elif "REFUTES" in output:
-        return "0"
+    output = output.lower().strip()
+    if "support" in output:
+        return 1
+    elif "refute" in output:
+        return 0
     else:
-        return output
+        return -1
