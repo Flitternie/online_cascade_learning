@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import tqdm
@@ -11,7 +12,10 @@ def pipeline(data_module, data, wrappers, mu):
     assert len(set([wrapper.model.args.num_labels for wrapper in wrappers])) == 1
     print("Data loaded, #labels: ", wrappers[0].model.args.num_labels)
     wrapper_names = [wrapper.name for wrapper in wrappers]
-    log_file = f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}.log"
+    # check if directory exists, create if not
+    if not os.path.exists(f"./logs/online_cascade_general/{data_module.DATASET}"):
+        os.makedirs(f"./logs/online_cascade_general/{data_module.DATASET}")
+    log_file = f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}_new.log"
     f = open(log_file, "w+")
     print(f"Writing to {log_file}")
 
@@ -24,6 +28,9 @@ def pipeline(data_module, data, wrappers, mu):
     llm_correct = 0
     llm_acted = 0
     overall_correct = 0
+
+    if hasattr(data_module, 'CustomMetrics'):
+        data_custom_metrics = data_module.CustomMetrics(len(wrappers))
 
     for wrapper in wrappers:
         wrapper.train()
@@ -100,8 +107,17 @@ def pipeline(data_module, data, wrappers, mu):
                 output += f"{model_score[j]/max(1,model_acted[j]):.4f},"
             for j, wrapper in enumerate(wrappers):
                 output += f"{model_correct[j]/(i+1):.4f},"
-            output += f"{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}\n"
+            output += f"{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}"
+
+            if hasattr(data_module, 'CustomMetrics'):
+                data_custom_metrics.update(model_acted, llm_acted, model_preds, llm_pred, item['label'])
+                custom_metrics = data_custom_metrics.get_metrics()
+                for idx, results in enumerate(custom_metrics[:len(wrappers)]):
+                    output += f", {wrappers[idx].name}: " + ";".join([f"{r:.4f}" for r in results])
+                output += f", LLM: " + ";".join([f"{r:.4f}" for r in custom_metrics[-2]])
+                output += f", Overall: " + ";".join([f"{r:.4f}" for r in custom_metrics[-1]])
             
+            output += "\n"
             f.write(output)
             bar.update(1)
             continue
@@ -186,16 +202,33 @@ def pipeline(data_module, data, wrappers, mu):
             output += f"{model_score[j]/max(1,model_acted[j]):.4f},"
         for j, wrapper in enumerate(wrappers):
             output += f"{model_correct[j]/(i+1):.4f},"
-        output += f"{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}\n"
+        output += f"{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}"
+
+        if hasattr(data_module, 'CustomMetrics'):
+            data_custom_metrics.update(model_acted, llm_acted, model_preds, llm_pred, item['label'])
+            custom_metrics = data_custom_metrics.get_metrics()
+            for idx, results in enumerate(custom_metrics[:len(wrappers)]):
+                output += f", {wrappers[idx].name}: " + ";".join([f"{r:.4f}" for r in results])
+            output += f", LLM: " + ";".join([f"{r:.4f}" for r in custom_metrics[-2]])
+            output += f", Overall: " + ";".join([f"{r:.4f}" for r in custom_metrics[-1]])
         
+        output += "\n"
         f.write(output)
         bar.update(1)
         
         if i % 10 == 0:
             description = ''''''
+            if hasattr(data_module, 'CustomMetrics'):
+                custom_metrics = data_custom_metrics.get_short_metrics()
+            else:
+                custom_metrics = None
             description += f"{overall_correct/(i+1):.4f} |"
             for j, wrapper in enumerate(wrappers):
                 description += f" {wrapper.name}: {model_update[j]}:{model_correct[j]/(i+1):.4f},"
-                description += f"{model_score[j]/max(1,model_acted[j]):.4f} |"
+                description += f"{model_score[j]/max(1,model_acted[j]):.4f}"
+                if custom_metrics:
+                    description += f",{custom_metrics[j][0]:.4f}"
+                description += " |"
+            
             bar.set_description(description)
     f.close()

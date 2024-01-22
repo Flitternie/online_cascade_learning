@@ -7,7 +7,7 @@ SystemPrompt = "You are a helpful, respectful and honest assistant. The user has
 Prompt = '''Here is the movie review: {} \n Tell me whether the above review overall shows a positive or negative sentiment towards the movie. Return the answer in one word.'''
 PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
 
-def postprocess(output):
+def postprocess(output: str) -> int:
     output = output.lower().strip()
     if "positive" in output:
         return 1

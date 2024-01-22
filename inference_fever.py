@@ -9,7 +9,7 @@ SystemPrompt = '''You are a helpful, respectful and honest assistant.
 Prompt = '''The following claim was made: {} \n Was this claim true or false? Return the answer in one word.'''
 PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
 
-def postprocess(output):
+def postprocess(output: str) -> int:
     output = output.lower().strip()
     if "true" in output:
         return 1
@@ -18,7 +18,7 @@ def postprocess(output):
     else:
         return -1
     
-def postprocess2(output):
+def postprocess2(output: str) -> int:
     output = output.lower().strip()
     if "support" in output:
         return 1

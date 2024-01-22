@@ -29,7 +29,7 @@ isear_to_id = {
   "disgust":  6,
 }
 
-def postprocess(output):
+def postprocess(output: str) -> int:
   low_output = output.lower().strip()
   for k, v in isear_to_id.items():
     if k in low_output:
