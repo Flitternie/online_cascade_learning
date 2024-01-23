@@ -26,7 +26,7 @@ class LogisticRegressionModelSkLearn():
 
     def train(self, train_data: dict) -> None:
         if "class_weight" in dir(self.args):
-            for label in train_data['label']:
+            for label in train_data['llm_label']:
                 self.class_count[int(label)] += 1
             if self.args.class_weight == "balanced":
                 # balanced class weights computed by: n_samples / (n_classes * np.bincount(y))
