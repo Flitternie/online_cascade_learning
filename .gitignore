@@ -4,12 +4,12 @@
 *.txt
 *.pyc
 *.zip
+*.csv
 extensions.json
 misc.ipynb
 
 /__pycache__
 /.vscode
-/data
 /*logs
 /misc
 /*results
