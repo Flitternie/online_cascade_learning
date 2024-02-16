@@ -38,6 +38,9 @@ class LogisticRegressionModelSkLearn():
             assert equal(sum(self.class_weight.values()), 1), f"Sum of class weights is {sum(self.class_weight.values())}"
             self.model.class_weight = sort_dict_by_key(self.class_weight)
         train_data_vector = self.vectorizer.transform(train_data['text'])
+        # print(train_data_vector)
+        # print("Training llm labels: ", train_data['llm_label'])
+        # print(np.arange(self.args.num_labels))
         self.model.partial_fit(train_data_vector, train_data['llm_label'], classes=np.arange(self.args.num_labels))
     
     def train_online(self, train_data: dict) -> None:
@@ -50,9 +53,16 @@ class LogisticRegressionModelSkLearn():
     def evaluate(self, test_data: dict) -> float:
         predictions = self.inference(test_data)
         correct = 0
+        tp, fn = 0, 0
         for i in range(len(predictions)):
             if int(np.argmax(predictions[i])) == test_data['label'][i]:
                 correct += 1
+            if int(np.argmax(predictions[i])) == 1 and test_data['label'][i] == 1:
+                tp += 1
+            if int(np.argmax(predictions[i])) == 0 and test_data['label'][i] == 1:
+                fn += 1
+        recall = tp / (tp + fn)
+        print(f"Recall: {recall}")
         return correct / len(predictions)
 
     def predict(self, input: str):

@@ -10,6 +10,6 @@ misc.ipynb
 /__pycache__
 /.vscode
 /data
-/logs
+/*logs
 /misc
 /*results

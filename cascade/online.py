@@ -15,7 +15,7 @@ def pipeline(data_module, data, wrappers, mu):
     # check if directory exists, create if not
     if not os.path.exists(f"./logs/online_cascade_general/{data_module.DATASET}"):
         os.makedirs(f"./logs/online_cascade_general/{data_module.DATASET}")
-    log_file = f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.6f}_new.log"
+    log_file = f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.8f}.log"
     f = open(log_file, "w+")
     print(f"Writing to {log_file}")
 
@@ -61,39 +61,40 @@ def pipeline(data_module, data, wrappers, mu):
                 llm_correct += 1
                 overall_correct += 1
             llm_acted += 1
-            for wrapper in wrappers:
-                wrapper.model.cache_add(text, llm_pred)
+            if llm_pred != -1:
+                for wrapper in wrappers:            
+                    wrapper.model.cache_add(text, llm_pred)
 
-            # warm-up wrappers, skip the first updates
-            if min(model_update) > 2:
-                for j, wrapper in enumerate(wrappers):
-                    decision, prob = wrapper(text)
-                    model_decisions[j] = decision
-                    pred = torch.argmax(prob, dim=-1).item()
-                    model_preds[j] = pred
-                    if int(pred) == item['label']:
-                        model_correct[j] += 1
-                    # set the decision to 0 if the model prediction matches the LLM label and 1 otherwise
-                    model_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to(wrapper.device)
-                    confidence_cost = mse_loss(decision, model_right_decision) 
-                    confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
-                    model_confidence_costs[j] = confidence_cost
-                    model_costs[j] = (1 - decision.transpose(0,1)[-1]) * cre_loss(prob, torch.tensor([llm_pred]).to(wrapper.device)) + decision.transpose(0,1)[-1] * wrapper.model.args.cost * mu
-                
-                total_cost = model_costs[0]
-                for j in range(1, len(wrappers)):
-                    k = j - 1
-                    while k >= 0: 
-                        model_costs[j] *= model_decisions[k].transpose(0,1)[-1]
-                        k -= 1
-                    total_cost += model_costs[j]
-                for j in range(len(wrappers)):
-                    model_confidence_costs[j].backward(retain_graph=True)
-                total_cost.backward()
-                for j in range(len(wrappers)):
-                    optimizers[j].step()
-                    optimizers[j].zero_grad()
-                    model_decisions[j] = float(model_decisions[j].squeeze(0)[-1].item())
+                # warm-up wrappers, skip the first updates
+                if min(model_update) > 2:
+                    for j, wrapper in enumerate(wrappers):
+                        decision, prob = wrapper(text)
+                        model_decisions[j] = decision
+                        pred = torch.argmax(prob, dim=-1).item()
+                        model_preds[j] = pred
+                        if int(pred) == item['label']:
+                            model_correct[j] += 1
+                        # set the decision to 0 if the model prediction matches the LLM label and 1 otherwise
+                        model_right_decision = torch.tensor([min(int(int(pred) != llm_pred), 1.0)]).float().unsqueeze(0).to(wrapper.device)
+                        confidence_cost = mse_loss(decision, model_right_decision) 
+                        confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
+                        model_confidence_costs[j] = confidence_cost
+                        model_costs[j] = (1 - decision.transpose(0,1)[-1]) * cre_loss(prob, torch.tensor([llm_pred]).to(wrapper.device)) + decision.transpose(0,1)[-1] * wrapper.model.args.cost * mu
+                    
+                    total_cost = model_costs[0]
+                    for j in range(1, len(wrappers)):
+                        k = j - 1
+                        while k >= 0: 
+                            model_costs[j] *= model_decisions[k].transpose(0,1)[-1]
+                            k -= 1
+                        total_cost += model_costs[j]
+                    for j in range(len(wrappers)):
+                        model_confidence_costs[j].backward(retain_graph=True)
+                    total_cost.backward()
+                    for j in range(len(wrappers)):
+                        optimizers[j].step()
+                        optimizers[j].zero_grad()
+                        model_decisions[j] = float(model_decisions[j].squeeze(0)[-1].item())
             
             output = ''''''
             for j, wrapper in enumerate(wrappers):
@@ -138,6 +139,7 @@ def pipeline(data_module, data, wrappers, mu):
             model_actions[j] = model_action
         
         llm_flag = True
+        acted_model_idx = -1
         for j, wrapper in enumerate(wrappers):
             # stop proceeding to the next level if the model has already acted
             if model_actions[j] == 0 and np.random.choice([False,True], p=[model_decaying_probs[j], 1-model_decaying_probs[j]]):
@@ -145,44 +147,47 @@ def pipeline(data_module, data, wrappers, mu):
                     model_score[j] += 1
                     overall_correct += 1
                 model_acted[j] += 1
+                acted_model_idx = j
                 llm_flag = False
                 break
         
         # proceed to llm
         if llm_flag:
+            acted_model_idx = len(wrappers)
             llm_pred = int(item['llm_label'])
             if int(llm_pred) == item['label']:
                 llm_correct += 1
                 overall_correct += 1
             llm_acted += 1
-            
-            for j, wrapper in enumerate(wrappers):
-                wrapper.model.cache_add(text, llm_pred)
-                # increment decision_correct if the model's prediction is correct and it took an action
-                model_decision_correct[j] += int(int(model_preds[j]) == llm_pred) ^ int(model_actions[j] != 0)
-                # wrapper.calibration is to adjust the model prediction's confidence, set to higher values for less capable models, range [0,0.5)
-                model_right_decision = torch.tensor([min(int(int(model_preds[j]) != llm_pred) + wrapper.calibration, 1.0)]).float().unsqueeze(0).to(wrapper.device)
-                model_confidence_cost = mse_loss(model_decisions[j], model_right_decision)
-                model_confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
-                model_confidence_costs[j] = model_confidence_cost
 
-                model_cost = (1 - model_decisions[j].transpose(0,1)[-1]) * cre_loss(model_probs[j], torch.tensor([llm_pred]).to(wrapper.device)) + model_decisions[j].transpose(0,1)[-1] * wrapper.model.args.cost * mu
-                model_costs[j] = model_cost
+            if llm_pred != -1:            
+                for j, wrapper in enumerate(wrappers):
+                    wrapper.model.cache_add(text, llm_pred)
+                    # increment decision_correct if the model's prediction is correct and it took an action
+                    model_decision_correct[j] += int(int(model_preds[j]) == llm_pred) ^ int(model_actions[j] != 0)
+                    # wrapper.calibration is to adjust the model prediction's confidence, set to higher values for less capable models, range [0,0.5)
+                    model_right_decision = torch.tensor([min(int(int(model_preds[j]) != llm_pred) + wrapper.calibration, 1.0)]).float().unsqueeze(0).to(wrapper.device)
+                    model_confidence_cost = mse_loss(model_decisions[j], model_right_decision)
+                    model_confidence_cost += wrapper.regularization * torch.sum(torch.stack([torch.sum(torch.square(param)) for param in wrapper.parameters()]))
+                    model_confidence_costs[j] = model_confidence_cost
 
-            total_cost = model_costs[0]
-            for j in range(1, len(wrappers)):
-                k = j - 1
-                while k >= 0: 
-                    model_costs[j] *= model_decisions[k].transpose(0,1)[-1]
-                    k -= 1
-                total_cost += model_costs[j]
-            for j in range(len(wrappers)):
-                model_confidence_costs[j].backward(retain_graph=True)
-            total_cost.backward()
-            for j in range(len(wrappers)):
-                optimizers[j].step()
-                optimizers[j].zero_grad()
-                model_decisions[j] = float(model_decisions[j].squeeze(0)[-1].item())
+                    model_cost = (1 - model_decisions[j].transpose(0,1)[-1]) * cre_loss(model_probs[j], torch.tensor([llm_pred]).to(wrapper.device)) + model_decisions[j].transpose(0,1)[-1] * wrapper.model.args.cost * mu
+                    model_costs[j] = model_cost
+
+                total_cost = model_costs[0]
+                for j in range(1, len(wrappers)):
+                    k = j - 1
+                    while k >= 0: 
+                        model_costs[j] *= model_decisions[k].transpose(0,1)[-1]
+                        k -= 1
+                    total_cost += model_costs[j]
+                for j in range(len(wrappers)):
+                    model_confidence_costs[j].backward(retain_graph=True)
+                total_cost.backward()
+                for j in range(len(wrappers)):
+                    optimizers[j].step()
+                    optimizers[j].zero_grad()
+                    model_decisions[j] = float(model_decisions[j].squeeze(0)[-1].item())
                 
             torch.cuda.empty_cache()
 
@@ -202,7 +207,9 @@ def pipeline(data_module, data, wrappers, mu):
             output += f"{model_score[j]/max(1,model_acted[j]):.4f},"
         for j, wrapper in enumerate(wrappers):
             output += f"{model_correct[j]/(i+1):.4f},"
-        output += f"{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f}"
+        output += f"{llm_correct/max(1,llm_acted):.4f},{overall_correct/(i+1):.4f},"
+        assert acted_model_idx >= 0 and acted_model_idx <= len(wrappers)
+        output += f"{acted_model_idx}"
 
         if hasattr(data_module, 'CustomMetrics'):
             data_custom_metrics.update(model_acted, llm_acted, model_preds, llm_pred, item['label'])

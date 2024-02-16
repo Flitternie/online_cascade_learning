@@ -7,10 +7,9 @@ class LlamaModel():
     def __init__(self, args: ModelArguments):
         self.args = args
         self.device = args.device
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model, device_map="auto")
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model = LlamaForCausalLM.from_pretrained(args.model) 
-        self.model = self.model.to(self.device)
+        self.model = LlamaForCausalLM.from_pretrained(args.model, device_map="auto")
         print("Llama Model loaded")
 
     def inference(self, dataloader: DataLoader) -> list[str]:
@@ -18,7 +17,7 @@ class LlamaModel():
         original_outputs = []
         print("Starting inference...")
         for batch in tqdm(dataloader):
-            batch = self.tokenizer.batch_encode_plus(batch, padding=True, return_tensors='pt')
+            batch = self.tokenizer.batch_encode_plus(batch[0], padding=True, truncation=True, return_tensors='pt')
             batch = batch.to(self.device)
             input_length = batch['input_ids'].shape[1]
             output = self.model.generate(

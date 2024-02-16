@@ -130,6 +130,7 @@ class BertModel():
 
     def evaluate(self, dataloader: DataLoader) -> tuple[torch.tensor, float]:
         correct, total = 0, 0
+        tp, fn = 0, 0
         outputs = torch.tensor([]).to(self.device)
         with torch.no_grad():
             for step, batch in enumerate(tqdm(dataloader)):
@@ -140,8 +141,13 @@ class BertModel():
                 predictions = torch.argmax(logits, dim=-1)
                 true_labels = batch[1].to(self.device)
                 correct += (predictions == true_labels).sum().item()
+                tp += ((predictions == true_labels) & (true_labels == 1)).sum().item()
+                fn += ((predictions != true_labels) & (true_labels == 1)).sum().item()
                 total += len(true_labels)
                 outputs = torch.cat((outputs, predictions))
+        # calculate recall
+        recall = tp / (tp + fn)
+        print (f"Recall: {recall}")
         return outputs, correct / total
     
     def predict(self, input: str) -> torch.tensor:
