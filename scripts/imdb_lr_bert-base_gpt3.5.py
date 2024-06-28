@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import argparse
 import importlib
+import sys
+import os
+
+# Get the absolute path of the project folder
+project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_path)
 
 import models.lr as lr
 import models.bert as bert
@@ -44,15 +50,6 @@ def main(mu):
     data = data.train_test_split(test_size=0.5)
     data = data['test']
 
-    # REBUTTAL EXPERIMENT
-    # sort the order of data by the length of text by first converting to pandas dataframe
-    data = pd.DataFrame(data)
-    data = data.sort_values(by='text', key=lambda x: x.str.len())
-    data = datasets.Dataset.from_pandas(data)
-    
-
-
-
     wrappers = []
 
     lr_config = ModelArguments()
@@ -90,15 +87,12 @@ def main(mu):
     bert_base_wrapper.to(bert_base_wrapper.device) 
     wrappers.append(bert_base_wrapper)
 
-    pipeline(data_module, data, wrappers, mu, log_dir="./logs/rebuttal/ds_length/gpt/")
+    pipeline(data_module, data, wrappers, mu, log_dir="./logs_test")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    # for mu in np.arange(0.00001, 0.0001, 0.00002):
+    # for mu in np.arange(0.0001, 0.001, 0.0001):
     #     main(mu)
-    for mu in np.arange(0.00011, 0.0002, 0.00002):
-        main(mu)
-    # for mu in np.arange(0.0002, 0.001, 0.0001):
-    #     main(mu)
+    main(0.00001)

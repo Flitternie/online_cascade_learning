@@ -1,5 +1,5 @@
 from transformers.models.llama.tokenization_llama import B_SYS, E_SYS
-from utils import *
+from datasets import Dataset
 
 DATASET = 'hatespeech'
 
@@ -7,14 +7,20 @@ SystemPrompt = "You are given a post from an online forum and you need to check 
 Prompt = '''Post: {}'''
 PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
 
+def preprocess(data: Dataset) -> Dataset:
+    return data
+
 def postprocess(output: str) -> int:
     output = output.lower().strip()
-    if "no" in output:
-        return 0
-    elif "yes" in output:
-        return 1
-    else:
-        return -1
+    try:
+        return int(output)
+    except ValueError:
+        if "no" in output:
+            return 0
+        elif "yes" in output:
+            return 1
+        else:
+            return -1
 
 class CustomMetrics():
     # return recall, precision, f1 for each of the models

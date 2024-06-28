@@ -1,0 +1,60 @@
+log: ./logs_refactored/
+seed: 42
+
+data: 
+  name: imdb
+  env: data.imdb
+  path: ./data/imdb_preprocessed.csv
+  num_labels: 2
+
+llm:
+  name: Llama2
+  source: "./llama_results/imdb_llama2_70b_chat.txt"
+
+models:
+  - name: LR
+    source: sklearn.linear_model
+    model: SGDClassifier
+    model_args:
+      loss: log_loss
+    cache_size: 8
+    cost: 1 # 110M for bert-base
+    wrapper:
+      learning_rate: 0.0007
+      regularization: 0.0001
+      decaying_factor: 0.99
+      calibration: 0.45
+  - name: BERT-base
+    source: transformers
+    model: AutoModelForSequenceClassification
+    model_args:
+      model_name_or_path: bert-base-uncased
+      batch_size: 8
+      num_epochs: 5
+      learning_rate: 1e-5
+    cache_size: 16
+    cost: 3 # 340M for bert-large
+    wrapper:
+      learning_rate: 0.0007
+      regularization: 0.0001
+      decaying_factor: 0.97
+      calibration: 0.4
+  - name: BERT-large
+    source: transformers
+    model: AutoModelForSequenceClassification
+    model_args:
+      model_name_or_path: bert-large-uncased
+      batch_size: 16
+      num_epochs: 5
+      learning_rate: 1e-5
+    cache_size: 32
+    cost: 636 # 70B for Llama2
+    wrapper:
+      learning_rate: 0.0007
+      regularization: 0.0001
+      decaying_factor: 0.95
+      calibration: 0.4
+
+mu: 
+  - [0.00001, 0.0001, 0.00002]
+  - [0.0001, 0.001, 0.0002]

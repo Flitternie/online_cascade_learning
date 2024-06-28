@@ -3,22 +3,30 @@ import pandas as pd
 import numpy as np
 import argparse
 import importlib
+import sys
+import os
+
+# Get the absolute path of the project folder
+project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_path)
 
 import models.lr as lr
 import models.bert as bert
 
 from utils import *
-from cascade.online import *
-        
+from cascade.online import * 
+
 def main(mu):
     print("cost coefficient: ", mu)
-    data_env = 'data.imdb'
+    data_env = 'data.fever'
     data_module = importlib.import_module(data_env)
     
     set_seed(42)
-    data = datasets.Dataset.from_pandas(pd.read_csv("./data/imdb_preprocessed.csv"))
+    data = datasets.Dataset.from_pandas(pd.read_csv("./data/fever_preprocessed.csv"))
+    # change label REFUTES to 0 and label SUPPORTS to 1
+    data = data.map(lambda example: {'label': 0 if example['label'] == 'REFUTES' else 1, 'text': example['text']})
 
-    llm_labels = open("./llama_results/imdb_llama2_70b_chat.txt", "r").readlines()
+    llm_labels = open("./llama_results/fever_llama2_70b_chat.txt", "r").readlines()
     llm_labels = [int(l.strip()) for l in llm_labels]
     total, correct = 0, 0
     for i, d in enumerate(data):
@@ -39,22 +47,10 @@ def main(mu):
         total += 1
     assert correct/total == 1.0 # should be 1.0
 
-    # filter out labels that are -1
-    # data = data.filter(lambda e: e['llm_label'] != -1)
-
     # split data into train and test
     data = data.shuffle()
     data = data.train_test_split(test_size=0.5)
     data = data['test']
-
-    # REBUTTAL EXPERIMENT
-    # sort the order of data by the length of text by first converting to pandas dataframe
-    data = pd.DataFrame(data)
-    data = data.sort_values(by='text', key=lambda x: x.str.len())
-    data = datasets.Dataset.from_pandas(data)
-    
-
-
 
     wrappers = []
 
@@ -64,7 +60,7 @@ def main(mu):
     lr_config.cost = 1 # 110M for bert-base
     lr_config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     lr_model = lr.LogisticRegressionModelSkLearn(lr_config, data=data['text'])
-    
+
     lr_wrapper = ModelWrapper(lr_model, lr_model.args)
     lr_wrapper.name = "LR"
     lr_wrapper.learning_rate = 0.0007
@@ -73,7 +69,7 @@ def main(mu):
     lr_wrapper.calibration = 0.4
     lr_wrapper.to(lr_wrapper.device)
     wrappers.append(lr_wrapper)
-    
+
     bert_base_config = ModelArguments()
     bert_base_config.num_labels = 2
     bert_base_config.model = "bert-base-uncased"
@@ -83,7 +79,7 @@ def main(mu):
     bert_base_config.cost = 636 # 130B for GPT-3
     bert_base_config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     bert_base_model = bert.BertModel(bert_base_config)
-    
+
     bert_base_wrapper = ModelWrapper(bert_base_model, bert_base_model.args)
     bert_base_wrapper.name = "BERT-base"
     bert_base_wrapper.learning_rate = 0.0007
@@ -93,13 +89,13 @@ def main(mu):
     bert_base_wrapper.to(bert_base_wrapper.device) 
     wrappers.append(bert_base_wrapper)
 
-    pipeline(data_module, data, wrappers, mu, log_dir="./logs/rebuttal/ds_length/llama/")
+    pipeline(data_module, data, wrappers, mu, log_dir="./logs_test")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    for mu in np.arange(0.00001, 0.0001, 0.00002):
+    for mu in np.arange(0.0010, 0.0040, 0.0005):
         main(mu)
-    for mu in np.arange(0.0001, 0.001, 0.0002):
+    for mu in np.arange(0.0001, 0.001, 0.0001):
         main(mu)

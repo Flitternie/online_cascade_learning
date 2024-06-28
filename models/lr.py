@@ -42,7 +42,18 @@ class LogisticRegressionModelSkLearn():
         # print("Training llm labels: ", train_data['llm_label'])
         # print(np.arange(self.args.num_labels))
         self.model.partial_fit(train_data_vector, train_data['llm_label'], classes=np.arange(self.args.num_labels))
-    
+        '''
+        # REBUTTAL EXPERIMENT: Calculate FLOPs
+        # Assuming each feature operation involves 2 FLOPs (1 multiplication, 1 addition)
+        # And assuming the gradient computation and weight update involve n FLOPs
+        n_features = train_data_vector.shape[1]
+        n_samples = train_data_vector.shape[0]
+        flops_per_sample = 2 * n_features + n_features  # dot product and weight update
+        total_flops = flops_per_sample * n_samples
+        with open("./flops.txt", "a") as f:
+            f.write(f"LR Training, {total_flops}\n")
+        '''
+        
     def train_online(self, train_data: dict) -> None:
         self.train(train_data)
 
@@ -67,5 +78,17 @@ class LogisticRegressionModelSkLearn():
 
     def predict(self, input: str):
         test_data = self.vectorizer.transform([input])
+        '''
+        # REBUTTAL EXPERIMENT: Calculate FLOPs
+        # Assuming each multiplication and addition in the dot product counts as 1 FLOP,
+        # and there's an additional set of operations for the logistic function,
+        # which we'll approximate as equal to the number of features for simplicity.
+        n_features = test_data.shape[1]
+        flops_for_dot_product = 2 * n_features  # each feature involves a multiplication and an addition
+        flops_for_logistic = n_features  # simplified estimate for the logistic function operations
+        total_flops = flops_for_dot_product + flops_for_logistic
+        with open("./flops.txt", "a") as f:
+            f.write(f"LR Inference, {total_flops}\n")
+        '''
         return self.model.predict_proba(test_data)
 

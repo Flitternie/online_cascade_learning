@@ -1,0 +1,44 @@
+log: ./logs_refactored/
+seed: 42
+
+data: 
+  name: isear
+  env: data.isear
+  path: ./data/isear_preprocessed.csv
+  num_labels: 7
+
+llm:
+  name: GPT3.5-turbo
+  source: "./gpt_results/gpt3.5/isear_gpt3.5_turbo_1106.txt"
+
+models:
+  - name: LR
+    source: sklearn.linear_model
+    model: SGDClassifier
+    model_args:
+      loss: log_loss
+    cache_size: 8
+    cost: 1 # 110M for bert-base
+    wrapper:
+      learning_rate: 0.0007
+      regularization: 0.0001
+      decaying_factor: 0.8
+      calibration: 0.15
+  - name: BERT-base
+    source: transformers
+    model: AutoModelForSequenceClassification
+    model_args:
+      model_name_or_path: bert-base-uncased
+      batch_size: 8
+      num_epochs: 5
+      learning_rate: 1e-5
+    cache_size: 16
+    cost: 1182 # 130B for GPT-3
+    wrapper:
+      learning_rate: 0.0007
+      regularization: 0.0001
+      decaying_factor: 0.9
+      calibration: 0.45
+
+mu: 
+ - [0.0012, 0.0025, 0.00002]

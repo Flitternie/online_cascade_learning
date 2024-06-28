@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import tqdm
 
-def pipeline(data_module, data, wrappers, mu):
+def pipeline(data_module, data, wrappers, mu, **kwargs):
     optimizers = [torch.optim.Adam(wrapper.parameters(), lr=wrapper.learning_rate) for wrapper in wrappers]
     mse_loss = torch.nn.MSELoss()
     cre_loss = torch.nn.CrossEntropyLoss()
@@ -12,10 +12,21 @@ def pipeline(data_module, data, wrappers, mu):
     assert len(set([wrapper.model.args.num_labels for wrapper in wrappers])) == 1
     print("Data loaded, #labels: ", wrappers[0].model.args.num_labels)
     wrapper_names = [wrapper.name for wrapper in wrappers]
-    # check if directory exists, create if not
-    if not os.path.exists(f"./logs/online_cascade_general/{data_module.DATASET}"):
-        os.makedirs(f"./logs/online_cascade_general/{data_module.DATASET}")
-    log_file = f"./logs/online_cascade_general/{data_module.DATASET}/{'_'.join(wrapper_names)}_{mu:.8f}.log"
+    
+    if 'log_dir' in kwargs.keys():
+        log_dir_path = os.path.join(kwargs['log_dir'], data_module.DATASET)
+        # check if directory exists, create if not
+        if not os.path.exists(log_dir_path):
+            os.makedirs(log_dir_path)
+        log_file = os.path.join(log_dir_path, f"{'_'.join(wrapper_names)}_{mu:.8f}.log")
+    elif 'config' in kwargs.keys():
+        log_dir_path = os.path.join(kwargs['config'].log, kwargs['config'].data.name)
+        # check if directory exists, create if not
+        if not os.path.exists(log_dir_path):
+            os.makedirs(log_dir_path)
+        log_file = os.path.join(log_dir_path, f"{'_'.join(wrapper_names)}_{kwargs['config'].llm.name}_{mu:.8f}.log")
+    else:
+        raise Exception("log directory not declared")
     f = open(log_file, "w+")
     print(f"Writing to {log_file}")
 

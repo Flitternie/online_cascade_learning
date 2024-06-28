@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import argparse
 import importlib
+import sys
+import os
+
+# Get the absolute path of the project folder
+project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_path)
 
 import models.lr as lr
 import models.bert as bert
@@ -12,13 +18,18 @@ from cascade.online import *
         
 def main(mu):
     print("cost coefficient: ", mu)
-    data_env = 'data.imdb'
+    data_env = 'data.isear'
     data_module = importlib.import_module(data_env)
     
     set_seed(42)
-    data = datasets.Dataset.from_pandas(pd.read_csv("./data/imdb_preprocessed.csv"))
+    data = datasets.Dataset.from_pandas(pd.read_csv("./data/isear_preprocessed.csv"))
 
-    llm_labels = open("./llama_results/imdb_llama2_70b_chat.txt", "r").readlines()
+    isear_to_id = data_module.isear_to_id
+
+    # Change labels to id
+    data = data.map(lambda e: {'label': isear_to_id[e['label']]})
+
+    llm_labels = open("./llama_results/isear_llama2_70b_chat.txt", "r").readlines()
     llm_labels = [int(l.strip()) for l in llm_labels]
     total, correct = 0, 0
     for i, d in enumerate(data):
@@ -50,7 +61,7 @@ def main(mu):
     wrappers = []
 
     lr_config = ModelArguments()
-    lr_config.num_labels = 2
+    lr_config.num_labels = 7
     lr_config.cache_size = 8
     lr_config.cost = 1 # 110M for bert-base
     lr_config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -61,12 +72,12 @@ def main(mu):
     lr_wrapper.learning_rate = 0.0007
     lr_wrapper.regularization = 0.0001
     lr_wrapper.decaying_factor = 0.99
-    lr_wrapper.calibration = 0.45
+    lr_wrapper.calibration = 0.4
     lr_wrapper.to(lr_wrapper.device)
     wrappers.append(lr_wrapper)
     
     bert_base_config = ModelArguments()
-    bert_base_config.num_labels = 2
+    bert_base_config.num_labels = 7
     bert_base_config.model = "bert-base-uncased"
     bert_base_config.cache_size = 16
     bert_base_config.batch_size = 8
@@ -80,12 +91,12 @@ def main(mu):
     bert_base_wrapper.learning_rate = 0.0007
     bert_base_wrapper.regularization = 0.0001
     bert_base_wrapper.decaying_factor = 0.97
-    bert_base_wrapper.calibration = 0.4
+    bert_base_wrapper.calibration = 0.35
     bert_base_wrapper.to(bert_base_wrapper.device) 
     wrappers.append(bert_base_wrapper)
 
     bert_large_config = ModelArguments()
-    bert_large_config.num_labels = 2
+    bert_large_config.num_labels = 7
     bert_large_config.model = "bert-large-uncased"
     bert_large_config.cache_size = 32
     bert_large_config.batch_size = 16
@@ -99,19 +110,19 @@ def main(mu):
     bert_large_wrapper.learning_rate = 0.0007
     bert_large_wrapper.regularization = 0.0001
     bert_large_wrapper.decaying_factor = 0.95
-    bert_large_wrapper.calibration = 0.4
+    bert_large_wrapper.calibration = 0.3
     bert_large_wrapper.to(bert_large_wrapper.device)
     wrappers.append(bert_large_wrapper)
 
-    pipeline(data_module, data, wrappers, mu)
+    pipeline(data_module, data, wrappers, mu, log_dir="./logs_test")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    # for mu in np.arange(0.000001, 0.0001, 0.000002):
-    #     main(mu)
-    for mu in np.arange(0.00001, 0.0001, 0.00002):
+    for mu in np.arange(0.001, 0.01, 0.001):
         main(mu)
-    for mu in np.arange(0.0001, 0.001, 0.0002):
+    for mu in np.arange(0.0051, 0.006, 0.0001):
+        main(mu)
+    for mu in np.arange(0.006, 0.009, 0.001):
         main(mu)

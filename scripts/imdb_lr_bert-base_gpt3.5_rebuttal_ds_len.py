@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import argparse
 import importlib
+import sys
+import os
+
+# Get the absolute path of the project folder
+project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_path)
 
 import models.lr as lr
 import models.bert as bert
@@ -44,6 +50,15 @@ def main(mu):
     data = data.train_test_split(test_size=0.5)
     data = data['test']
 
+    # REBUTTAL EXPERIMENT
+    # sort the order of data by the length of text by first converting to pandas dataframe
+    data = pd.DataFrame(data)
+    data = data.sort_values(by='text', key=lambda x: x.str.len())
+    data = datasets.Dataset.from_pandas(data)
+    
+
+
+
     wrappers = []
 
     lr_config = ModelArguments()
@@ -57,7 +72,7 @@ def main(mu):
     lr_wrapper.name = "LR"
     lr_wrapper.learning_rate = 0.0007
     lr_wrapper.regularization = 0.0001
-    lr_wrapper.decaying_factor = 0.99
+    lr_wrapper.decaying_factor = 0.97
     lr_wrapper.calibration = 0.4
     lr_wrapper.to(lr_wrapper.device)
     wrappers.append(lr_wrapper)
@@ -68,7 +83,7 @@ def main(mu):
     bert_base_config.cache_size = 16
     bert_base_config.batch_size = 8
     bert_base_config.num_epochs = 5
-    bert_base_config.cost = 3 # 340M for bert-large
+    bert_base_config.cost = 1182 # 130B for GPT-3
     bert_base_config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     bert_base_model = bert.BertModel(bert_base_config)
     
@@ -76,35 +91,20 @@ def main(mu):
     bert_base_wrapper.name = "BERT-base"
     bert_base_wrapper.learning_rate = 0.0007
     bert_base_wrapper.regularization = 0.0001
-    bert_base_wrapper.decaying_factor = 0.97
-    bert_base_wrapper.calibration = 0.35
+    bert_base_wrapper.decaying_factor = 0.95
+    bert_base_wrapper.calibration = 0.3
     bert_base_wrapper.to(bert_base_wrapper.device) 
     wrappers.append(bert_base_wrapper)
 
-    bert_large_config = ModelArguments()
-    bert_large_config.num_labels = 2
-    bert_large_config.model = "bert-large-uncased"
-    bert_large_config.cache_size = 32
-    bert_large_config.batch_size = 16
-    bert_large_config.num_epochs = 5
-    bert_large_config.cost = 1182 #130B for GPT-3
-    bert_large_config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    bert_large_model = bert.BertModel(bert_large_config)
-
-    bert_large_wrapper = ModelWrapper(bert_large_model, bert_large_model.args)
-    bert_large_wrapper.name = "BERT-large"
-    bert_large_wrapper.learning_rate = 0.0007
-    bert_large_wrapper.regularization = 0.0001
-    bert_large_wrapper.decaying_factor = 0.95
-    bert_large_wrapper.calibration = 0.3
-    bert_large_wrapper.to(bert_large_wrapper.device)
-    wrappers.append(bert_large_wrapper)
-
-    pipeline(data_module, data, wrappers, mu)
+    pipeline(data_module, data, wrappers, mu, log_dir="./logs_test")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    for mu in np.arange(0.000001, 0.0001, 0.000001):
+    # for mu in np.arange(0.00001, 0.0001, 0.00002):
+    #     main(mu)
+    for mu in np.arange(0.00011, 0.0002, 0.00002):
         main(mu)
+    # for mu in np.arange(0.0002, 0.001, 0.0001):
+    #     main(mu)

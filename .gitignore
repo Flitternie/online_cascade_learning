@@ -5,6 +5,7 @@
 *.pyc
 *.zip
 *.csv
+*.gz
 extensions.json
 misc.ipynb
 
@@ -13,3 +14,4 @@ misc.ipynb
 /*logs
 /misc
 /*results
+/data/*/

@@ -24,7 +24,19 @@ class BertModel():
         torch.cuda.empty_cache()
         self.model = AutoModelForSequenceClassification.from_pretrained(self.args.model, num_labels=self.args.num_labels)
         self.model = self.model.to(self.device)
-    
+    '''
+    # REBUTTAL EXPERIMENT: Calculate FLOPs
+    # For BERT, the theoretical number of FLOPs per layer can be approximated as 2 * d * n^2 + 2 * d^2 * n
+    def get_flops_per_pass(self):
+        sequence_length = self.args.max_length
+        hidden_size = self.model.config.hidden_size
+        num_attention_heads = self.model.config.num_attention_heads
+        num_layers = self.model.config.num_hidden_layers
+        # Estimate based on the simplified calculation for Transformer layers
+        self_attention_flops = 2 * sequence_length * sequence_length * num_attention_heads
+        feed_forward_flops = 2 * sequence_length * hidden_size * hidden_size
+        return (self_attention_flops + feed_forward_flops) * num_layers
+    '''
     def cache_add(self, text: str, label: int) -> None:
         self.online_cache["text"].append(text)
         self.online_cache["llm_label"].append(label)
@@ -53,7 +65,10 @@ class BertModel():
                 self.class_weight = sort_dict_by_key(self.class_weight)
             else:
                 self.class_weight = None
-                
+            '''
+            # REBUTTAL EXPERIMENT: Calculate FLOPs
+            total_flops = 0
+            '''
             # setup progress bar to show loss
             pbar = tqdm(train_dataloader)
             for step, batch in enumerate(pbar):
@@ -70,6 +85,14 @@ class BertModel():
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
+        '''
+                # REBUTTAL EXPERIMENT: Calculate FLOPs
+                total_flops += self.get_flops_per_pass() * 2 * self.args.model_args.batch_size # 2 passes for forward and backward
+        
+        # REBUTTAL EXPERIMENT: Save FLOPs
+        with open("./flops.txt", "a") as f:
+            f.write(f"BERT Training, {total_flops}\n")
+        '''
         # do evaluation
         predictions, val_acc = self.evaluate(val_dataloader)
         # save best performing model
@@ -98,6 +121,10 @@ class BertModel():
             self.class_weight = sort_dict_by_key(self.class_weight)
         else:
             self.class_weight = None
+        '''
+        # REBUTTAL EXPERIMENT: Calculate FLOPs
+        total_flops = 0
+        '''
         # setup progress bar to show loss
         for epoch in range(self.args.num_epochs):
             for step, batch in enumerate(data):
@@ -114,9 +141,19 @@ class BertModel():
                 loss.mean().backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
+        '''
+                # REBUTTAL EXPERIMENT: Calculate FLOPs
+                total_flops += self.get_flops_per_pass() * 2 * self.args.batch_size # 2 passes for forward and backward
+        
+        # REBUTTAL EXPERIMENT: Save FLOPs
+        with open("./flops.txt", "a") as f:
+            f.write(f"BERT Training, {total_flops}\n")
+        '''
         self.model.eval()            
 
     def inference(self, dataloader: DataLoader) -> torch.tensor:
+        # REBUTTAL EXPERIMENT
+        raise NotImplementedError("This method is not implemented for Rebuttal Experiment.")
         self.model.eval()
         probs = torch.tensor([]).to(self.device)
         with torch.no_grad():
@@ -152,9 +189,21 @@ class BertModel():
     
     def predict(self, input: str) -> torch.tensor:
         self.model.eval()
+        '''
+        # REBUTTAL EXPERIMENT: Calculate FLOPs
+        total_flops = 0
+        '''
         with torch.no_grad():
             input = self.tokenizer.encode_plus(input, padding='max_length', max_length=self.args.max_length, truncation=True, return_tensors='pt')
             input = input.to(self.device)
             logits = self.model(**input).logits
             probs = nn.functional.softmax(logits, dim=-1)
+        '''
+            # REBUTTAL EXPERIMENT: Calculate FLOPs
+            total_flops += self.get_flops_per_pass()
+        
+        # REBUTTAL EXPERIMENT: Save FLOPs
+        with open("./flops.txt", "a") as f:
+            f.write(f"BERT Inference, {total_flops}\n")
+        '''
         return probs

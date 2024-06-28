@@ -1,5 +1,5 @@
 from transformers.models.llama.tokenization_llama import B_SYS, E_SYS
-from utils import *
+from datasets import Dataset
 
 DATASET = 'isear'
 
@@ -29,9 +29,16 @@ isear_to_id = {
   "disgust":  6,
 }
 
+def preprocess(data: Dataset) -> Dataset:
+  data = data.map(lambda e: {'label': isear_to_id[e['label']]})
+  return data
+
 def postprocess(output: str) -> int:
   low_output = output.lower().strip()
-  for k, v in isear_to_id.items():
-    if k in low_output:
-      return v
-  return -1
+  try:
+    return int(low_output)
+  except ValueError:
+    for k, v in isear_to_id.items():
+      if k in low_output:
+        return v
+    return -1

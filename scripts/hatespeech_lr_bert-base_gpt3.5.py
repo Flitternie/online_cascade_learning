@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import argparse
 import importlib
+import sys
+import os
+
+# Get the absolute path of the project folder
+project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_path)
 
 import models.lr as lr
 import models.bert as bert
@@ -81,11 +87,11 @@ def main(mu):
     bert_base_wrapper.to(bert_base_wrapper.device) 
     wrappers.append(bert_base_wrapper)
 
-    pipeline(data_module, data, wrappers, mu)
+    pipeline(data_module, data, wrappers, mu, log_dir="./logs_test")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    for mu in np.arange(0.000001, 0.00001, 0.000001):
+    for mu in np.arange(0.000001, 0.000006, 0.000001):
         main(mu)

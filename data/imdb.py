@@ -1,5 +1,5 @@
 from transformers.models.llama.tokenization_llama import B_SYS, E_SYS
-from utils import *
+from datasets import Dataset
 
 DATASET = 'imdb'
 
@@ -7,11 +7,17 @@ SystemPrompt = "You are a helpful, respectful and honest assistant. The user has
 Prompt = '''Here is the movie review: {} \n Tell me whether the above review overall shows a positive or negative sentiment towards the movie. Return the answer in one word.'''
 PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
 
+def preprocess(data: Dataset) -> Dataset:
+    return data
+
 def postprocess(output: str) -> int:
     output = output.lower().strip()
-    if "positive" in output:
-        return 1
-    elif "negative" in output:
-        return 0
-    else:
-        return -1
+    try:
+        return int(output)
+    except ValueError:
+        if "positive" in output:
+            return 1
+        elif "negative" in output:
+            return 0
+        else:
+            return -1
