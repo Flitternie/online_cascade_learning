@@ -82,7 +82,7 @@ class GenericTransformersModel(BaseModel):
         """
         online_data = GenericDataset(self.online_cache)
         data = DataLoader(online_data, batch_size=self.args.model_args.batch_size, shuffle=True)
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.model_args.learning_rate)
         self.model.train()
         
         for _ in range(self.args.model_args.num_epochs):
@@ -96,6 +96,7 @@ class GenericTransformersModel(BaseModel):
                 loss.mean().backward()
                 optimizer.step()
                 optimizer.zero_grad()
+        self.cache_clear()
 
     def inference(self, dataloader: DataLoader) -> torch.tensor:
         """

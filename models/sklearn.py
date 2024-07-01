@@ -51,9 +51,13 @@ class GenericSklearnModel(BaseModel):
         """
         # Transform text data into TF-IDF vectors
         train_data_vector = self.vectorizer.transform(train_data['text'])
-        # Train the model using partial fit
-        self.model.partial_fit(train_data_vector, train_data['llm_label'], classes=np.arange(self.args.num_labels))
-        
+        if "partial_fit" in dir(self.model):
+            # Train the model using partial fit
+            self.model.partial_fit(train_data_vector, train_data['llm_label'], classes=np.arange(self.args.num_labels))
+        else:
+            # Train the model using fit
+            self.model.fit(train_data_vector, train_data['llm_label'])
+
     def train_online(self, train_data: dict) -> None:
         """
         Train the model using online (incremental) training data.
@@ -61,7 +65,15 @@ class GenericSklearnModel(BaseModel):
         Parameters:
             train_data (dict): Dictionary containing 'text' and 'llm_label' keys for training data.
         """
-        self.train(train_data)
+        # Transform text data into TF-IDF vectors
+        train_data_vector = self.vectorizer.transform(train_data['text'])
+        if "partial_fit" in dir(self.model):
+            # Train the model using partial_fit and clean the cache
+            self.model.partial_fit(train_data_vector, train_data['llm_label'], classes=np.arange(self.args.num_labels))
+            self.cache_clear()
+        else:
+            # Train the model using fit without cache clearing
+            self.model.fit(train_data_vector, train_data['llm_label'])
 
     def inference(self, data: dict):
         """
