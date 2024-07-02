@@ -1,10 +1,9 @@
 <div align="center">
   <a href="https://flitternie.github.io/ocl/">
-    <img style="margin-bottom: 1.5rem" align="center" width="300" src="./docs/logo.png">
+    <img align="center" width="400" src="./docs/logo.png">
   </a>
 </div>
-
-
+<br>
 Implementation for ICML 2024 Paper "[Online Cascade Learning for Efficient Inference over Streams](https://arxiv.org/pdf/2402.04513)".
 
 ## Installation
