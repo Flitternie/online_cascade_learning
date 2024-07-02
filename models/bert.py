@@ -3,7 +3,8 @@ import torch.nn as nn
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from utils import *
+from data import GenericDataset
+from utils import ModelArguments, sort_dict_by_key, equal
 
 class BertModel():
     def __init__(self, args: ModelArguments) -> None:

@@ -128,3 +128,42 @@ class BaseModel(ABC):
         Prediction for the input string.
         """
         pass
+
+class BaseLLM(ABC):
+    """
+    BaseLLM is an abstract base class for large language models (LLMs).
+    It serves as a template for creating language models, enforcing the implementation
+    of essential methods required for making predictions.
+
+    Attributes:
+    -----------
+    args : ModelArguments
+        A configuration object containing model arguments and settings.
+    """
+    
+    def __init__(self, args):
+        """
+        Initializes the BaseLLM with the given arguments.
+
+        Parameters:
+        -----------
+        args : ModelArguments
+            A configuration object containing model arguments and settings.
+        """
+        self.args = args
+
+    @abstractmethod
+    def predict(self, input: str):
+        """
+        Makes a prediction for a single input string.
+
+        Parameters:
+        -----------
+        input : str
+            A single input string to be predicted.
+
+        Returns:
+        --------
+        Prediction for the input string.
+        """
+        pass

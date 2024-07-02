@@ -4,7 +4,8 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from models.base_model import BaseModel
-from utils import ModelArguments, GenericDataset
+from data import GenericDataset
+from utils import ModelArguments
 
 class GenericTransformersModel(BaseModel):
     """
@@ -51,7 +52,7 @@ class GenericTransformersModel(BaseModel):
             train_dataloader (DataLoader): DataLoader for training data.
             val_dataloader (DataLoader): DataLoader for validation data.
         """
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.model_args.learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=float(self.args.model_args.learning_rate))
         best_val_acc = 0
 
         for epoch in range(self.args.model_args.num_epochs):
@@ -82,7 +83,7 @@ class GenericTransformersModel(BaseModel):
         """
         online_data = GenericDataset(self.online_cache)
         data = DataLoader(online_data, batch_size=self.args.model_args.batch_size, shuffle=True)
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.model_args.learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=float(self.args.model_args.learning_rate))
         self.model.train()
         
         for _ in range(self.args.model_args.num_epochs):

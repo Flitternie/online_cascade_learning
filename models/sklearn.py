@@ -15,7 +15,7 @@ class GenericSklearnModel(BaseModel):
         class_count (list): List to keep track of the count of each class in the training data.
         online_cache (dict): Cache for storing text and labels for online training.
     """
-    def __init__(self, args: ModelArguments, model_class: ClassifierMixin, corpus: list[str], **model_kwargs):
+    def __init__(self, args: ModelArguments, model_class: ClassifierMixin, corpus: list[str], **model_kwargs) -> None:
         """
         Initialize the GenericSklearnModel class.
 
