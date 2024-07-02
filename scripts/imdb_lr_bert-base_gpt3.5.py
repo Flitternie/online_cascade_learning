@@ -93,6 +93,5 @@ def main(mu):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mu", type=float, default=0.02)
-    # for mu in np.arange(0.0001, 0.001, 0.0001):
-    #     main(mu)
-    main(0.00001)
+    for mu in np.arange(0.0001, 0.001, 0.0001):
+        main(mu)

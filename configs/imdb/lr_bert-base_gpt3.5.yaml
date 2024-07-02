@@ -9,8 +9,6 @@ data:
 
 llm:
   name: GPT3.5-turbo
-  # source: openai
-  # model: gpt3.5-turbo
   source: "./gpt_results/gpt3.5/imdb_gpt3.5_turbo_1106.txt"
 
 models:
