@@ -150,7 +150,8 @@ class BertModel():
         with open("./flops.txt", "a") as f:
             f.write(f"BERT Training, {total_flops}\n")
         '''
-        self.model.eval()            
+        self.model.eval()
+        self.cache_clear()            
 
     def inference(self, dataloader: DataLoader) -> torch.tensor:
         # REBUTTAL EXPERIMENT

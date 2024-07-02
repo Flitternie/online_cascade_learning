@@ -56,6 +56,7 @@ class LogisticRegressionModelSkLearn():
         
     def train_online(self, train_data: dict) -> None:
         self.train(train_data)
+        self.cache_clear()
 
     def inference(self, data: dict):
         test_data = self.vectorizer.transform(data['text'])
