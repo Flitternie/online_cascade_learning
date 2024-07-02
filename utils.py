@@ -23,30 +23,6 @@ def load_config(file_path: str) -> YAMLObject:
         data = yaml.safe_load(file)
     return YAMLObject(data)
 
-# Custom Dataset class to load data
-class GenericDataset(Dataset):
-    def __init__(self, data: dict):
-        self.data = data
-        self.text = data['text']
-        try:
-            self.labels = data['label']
-        except:
-            self.labels = data['llm_label']
-        try:
-            self.llm_labels = data['llm_label']
-        except:
-            pass
-        self.num_labels = len(set(self.labels))
-    
-    def __len__(self) -> int:
-        return len(self.text)
-    
-    def __getitem__(self, idx: int) -> tuple[str, int]:
-        try:
-            return self.text[idx], self.labels[idx], self.llm_labels[idx]
-        except:
-            return self.text[idx], self.labels[idx]
-
 # Custom argument class to store model arguments
 class ModelArguments():
     def __init__(self):
