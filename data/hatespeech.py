@@ -4,8 +4,10 @@ from datasets import Dataset
 DATASET = 'hatespeech'
 
 SystemPrompt = "You are given a post from an online forum and you need to check whether the post contains any hate speech. Return your answer in one word (yes or no) without any explanations. "
-Prompt = '''Post: {}'''
-PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
+UserPrompt = '''Post: {}'''
+PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, UserPrompt, "[/INST]"])
+
+LabelList = ['yes', 'no']
 
 def preprocess(data: Dataset) -> Dataset:
     return data

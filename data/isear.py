@@ -16,8 +16,10 @@ SystemPrompt = """In this task, you will be performing a classification exercise
  This classification will require an understanding of the nuances of human emotions and the context in which the sentences are presented. 
  Remember, you have to classify the sentences using only anger, joy, sadnes, guilt, shame, fear or disgust. Please respond with only the word and nothing else.  
  """
-Prompt = '''{} \n Classify the emotion of this hypothetical sentence. Respond in exactly one word in all lowercase with a response in the exact format requested by the user. Do not acknowledge my request with "sure" or in any other way besides going straight to the answer. Only answer in exactly one word.'''
-PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
+UserPrompt = '''{} \n Classify the emotion of this hypothetical sentence. Respond in exactly one word in all lowercase with a response in the exact format requested by the user. Do not acknowledge my request with "sure" or in any other way besides going straight to the answer. Only answer in exactly one word.'''
+PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, UserPrompt, "[/INST]"])
+
+LabelList = ['joy', 'sadness', 'anger', 'guilt', 'shame', 'fear', 'disgust']
 
 isear_to_id = {
   "joy":      0,

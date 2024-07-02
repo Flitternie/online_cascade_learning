@@ -6,8 +6,10 @@ DATASET = 'fever'
 SystemPrompt = '''You are a helpful, respectful and honest assistant. 
                   This is a fact-checking task. You are to use your knowledge to determine whether a given claim is true or false.
                   Only answer either ’true’ or ’false’.'''
-Prompt = '''The following claim was made: {} \n Was this claim true or false? Return the answer in one word.'''
-PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, Prompt, "[/INST]"])
+UserPrompt = '''The following claim was made: {} \n Was this claim true or false? Return the answer in one word.'''
+PROMPT = " ".join(["[INST]", B_SYS, SystemPrompt, E_SYS, UserPrompt, "[/INST]"])
+
+LabelList = ['true', 'false']
 
 def preprocess(data: Dataset) -> Dataset:
     # change label REFUTES to 0 and label SUPPORTS to 1
