@@ -1,4 +1,4 @@
-# README.md for Data Module Implementations
+# Data Module Specification
 
 This document specifies the general requirements and guidelines for implementing a data module for different datasets. Ensure that each component is properly defined and formatted to maintain readability and functionality.
 

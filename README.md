@@ -17,8 +17,8 @@ To use this project, follow these steps:
 ## Usage
 
 1. Prepare your dataset using [Huggingface Datasets](https://huggingface.co/docs/datasets/) library. 
-2. Create `<dataset_name>.py` under `./data/`, specifying your data `preprocess` and `postprocess` functions.
-3. Create `.yaml` configuration file to customize your cascade and hyperparameters. Read [configuration specification](./configs/README.md) for details. 
+2. Create `<dataset_name>.py` under `./data/`, specifying your data `preprocess` and `postprocess` functions. Read [Data Module Specification](./data/README.md) for details.
+3. Create `.yaml` configuration file to customize your cascade and hyperparameters. Read [Configuration File Specification](./configs/README.md) for details. 
 4. Run online cascade learning: `python run.py --config <path_to_config>`.
 
 ## Contributing
