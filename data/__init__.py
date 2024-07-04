@@ -126,7 +126,7 @@ class CustomDataset:
         }
 
 
-class GenericDataset(Dataset):
+class GenericDataset:
     """
     A generic dataset class to handle data loading and processing.
 
