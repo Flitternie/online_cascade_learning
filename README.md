@@ -25,6 +25,8 @@ To use this project, follow these steps:
 
 Contributions are welcome! If you find any issues or have suggestions for improvements, please open an issue or submit a pull request.
 
+Project contributors: @[Flitternie](https://github.com/Flitternie/) @[Dingz9926](https://github.com/Dingz9926)
+
 ## Citation
 ```
 @inproceedings{nie2024online,
