@@ -5,9 +5,9 @@ from .wrapper import ModelWrapper
 from .sklearn import GenericSklearnModel
 from .transformers import GenericTransformersModel
 from .openai import GenericOpenAIModel
+from .llm import GenericLLM
 
 def llm_factory(llm_config, data_config, **llm_kwargs):
-    # llm_kwargs = llm_kwargs | llm_config.model_args.serialize() # Merge the two dictionaries
     data_module = importlib.import_module(data_config.env)
     if os.path.isfile(llm_config.source): # If the LLM source is a file
         llm_labels = open(llm_config.source, "r").readlines()
@@ -15,7 +15,7 @@ def llm_factory(llm_config, data_config, **llm_kwargs):
     elif "openai" in llm_config.source.lower():
         llm = GenericOpenAIModel(llm_config, data_module, **llm_kwargs)
     else:
-        raise NotImplementedError(f"LLM source {llm_config.source} not supported.")
+        llm = GenericLLM(llm_config, data_module, **llm_kwargs)
     return llm
 
 def model_factory(model_config, data_config, **model_kwargs):
