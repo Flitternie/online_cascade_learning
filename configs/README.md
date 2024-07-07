@@ -44,7 +44,7 @@ data:
 
 ## LLM Configuration
 
-The configuration for Large Language Models (LLMs) can be defined in two ways and currently supports `openai` and `llama` as sources.
+The configuration for Large Language Models (LLMs) can be defined in two ways and currently supports wide range of LLMs providers including `openai`, `anthropic`, `mistral`, `gemini`, etc., thanks to the standardized interface provided by [LiteLLM](https://github.com/BerriAI/litellm). Check [here](https://docs.litellm.ai/docs/providers) for the full list of supported LLMs.
 
 ### By Pre-generated File
 
@@ -64,11 +64,17 @@ llm:
   name: llm_name
   source: llm_source
   model: llm_model_identifier
+  api_key: llm_api_key
+  # Additional arguments specific to the language model
+  other_args_key1: other_args_value1
+  other_args_key2: other_args_value2
 ```
 
 - **name**: The name of the language model.
-- **source**: The provider of the language model (`openai` or `llama`).
-- **model**: The specific model to be used (e.g., `gpt-3.5-turbo-1106`).
+- **source**: The provider of the language model. Check [here](https://docs.litellm.ai/docs/providers) for the full list of supported providers
+- **model**: The specific model to be used (e.g., `gpt-3.5-turbo-1106`). Check [here](https://docs.litellm.ai/docs/providers) for details. 
+- **api_key**: The API key for the language model provider. Specify either via the configuration file or environment variable.
+- **other_args**: Additional arguments specific to the language model.
 
 ## Models Configuration
 
