@@ -16,7 +16,7 @@ To use this project, follow these steps:
 
 ## Usage
 
-1. Prepare your dataset using [Huggingface Datasets](https://huggingface.co/docs/datasets/) library. 
+1. Prepare your dataset using [Huggingface Datasets](https://huggingface.co/docs/datasets/) library. Preprocessed data for reproducing paper results are available [here](https://drive.google.com/file/d/1vQR7pqVqmYndHkfpcEpwCSWYDXON0gkl/view?usp=sharing).
 2. Create `<dataset_name>.py` under `./data/`, specifying your data `preprocess` and `postprocess` functions. Read [Data Module Specification](./data/README.md) for details.
 3. Create `.yaml` configuration file to customize your cascade and hyperparameters. We currently support [Scikit-learn](https://scikit-learn.org/stable/index.html) classification models and [Huggingface transformers](https://huggingface.co/docs/transformers/en/model_doc/auto#transformers.AutoModelForSequenceClassification) sequence classification models to compose a cascade. Most common LLMs, like OpenAI GPT, Anthropic Claude, Google Gemini, Mistral, etc., are supported! Read [Configuration File Specification](./configs/README.md) for details. 
 4. Run online cascade learning: `python run.py --config <path_to_config>`.
